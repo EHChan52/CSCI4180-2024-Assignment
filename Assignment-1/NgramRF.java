@@ -20,7 +20,6 @@ public class NgramRF {
     public static class TokenizerMapper extends Mapper<Object, Text, Text, MapWritable> {
         private int N;
         private Map<String, MapWritable> ngramCounts = new HashMap<>();
-        private Text prefixKey = new Text();
     
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -32,26 +31,28 @@ public class NgramRF {
             String line = value.toString().toLowerCase();
             StringTokenizer itr = new StringTokenizer(line);
             ArrayList<String> tokens = new ArrayList<>();
-            
+    
             while (itr.hasMoreTokens()) {
                 tokens.add(itr.nextToken().replaceAll("[^a-zA-Z]", ""));
             }
-    
+
             for (int i = 0; i <= tokens.size() - N; i++) {
                 StringBuilder ngramBuilder = new StringBuilder();
-                for (int j = 0; j < N - 1; j++) {
-                    if (j > 0) ngramBuilder.append(" ");
+                for (int j = 1; j < N; j++) {
+                    if (j > 0) {
+                        ngramBuilder.append(" ");
+                    }
                     ngramBuilder.append(tokens.get(i + j));
                 }
     
-                String prefix = ngramBuilder.toString();
-                String nextWord = tokens.get(i + N - 1);
+                String prefix = tokens.get(i);
+                String followingWords = ngramBuilder.toString();
     
                 MapWritable stripe = ngramCounts.getOrDefault(prefix, new MapWritable());
-                Text nextWordText = new Text(nextWord);
-                IntWritable count = (IntWritable) stripe.getOrDefault(nextWordText, new IntWritable(0));
+                Text followingWordsText = new Text(followingWords);
+                IntWritable count = (IntWritable) stripe.getOrDefault(followingWordsText, new IntWritable(0));
                 count.set(count.get() + 1);
-                stripe.put(nextWordText, count);
+                stripe.put(followingWordsText, count);
                 ngramCounts.put(prefix, stripe);
             }
         }
@@ -59,8 +60,12 @@ public class NgramRF {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             for (Map.Entry<String, MapWritable> entry : ngramCounts.entrySet()) {
-                prefixKey.set(entry.getKey());
-                context.write(prefixKey, entry.getValue());
+                IntWritable totalCount = 0;
+                for (Map.Entry<Text, IntWritable> followingEntry : entry.entrySet()){
+                    totalCount.set(totalCount.get() + followingEntry.get());
+                }
+                Text prefixText = new Text(entry.getKey());
+                context.write(prefixText, entry.getValue().put("*", totalCount));
             }
         }
     }
@@ -79,20 +84,22 @@ public class NgramRF {
             MapWritable aggregateStripe = new MapWritable();
             int totalCount = 0;
     
-            // Aggregate all MapWritable stripes
             for (MapWritable stripe : values) {
                 for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
                     Text nextWord = (Text) entry.getKey();
                     IntWritable count = (IntWritable) entry.getValue();
-                    
-                    IntWritable currentCount = (IntWritable) aggregateStripe.getOrDefault(nextWord, new IntWritable(0));
-                    currentCount.set(currentCount.get() + count.get());
-                    aggregateStripe.put(nextWord, currentCount);
+    
+                    if (aggregateStripe.containsKey(nextWord)) {
+                        IntWritable currentCount = (IntWritable) aggregateStripe.get(nextWord);
+                        currentCount.set(currentCount.get() + count.get());
+                    } else {
+                        aggregateStripe.put(nextWord, new IntWritable(count.get()));
+                    }
+    
                     totalCount += count.get();
                 }
             }
     
-            // Calculate relative frequencies and write if frequency >= theta
             for (Map.Entry<Writable, Writable> entry : aggregateStripe.entrySet()) {
                 Text nextWord = (Text) entry.getKey();
                 int count = ((IntWritable) entry.getValue()).get();
