@@ -10,6 +10,7 @@ import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -74,10 +75,26 @@ public class NgramRF {
         }
     }
 
+    // public static class Combiner extends Reducer<Text, MapWritable, Text, MapWritable> {
+    //     @Override
+    //     public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
+    //         MapWritable combinedStripe = new MapWritable();
+    //         for (MapWritable stripe : values) {
+    //             for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
+    //                 Text nextWord = (Text) entry.getKey();
+    //                 IntWritable count = (IntWritable) entry.getValue();
+    //                 IntWritable combinedCount = (IntWritable) combinedStripe.getOrDefault(nextWord, new IntWritable(0));
+    //                 combinedCount.set(combinedCount.get() + count.get());
+    //                 combinedStripe.put(nextWord, combinedCount);
+    //             }
+    //         }
+    //         context.write(key, combinedStripe);
+    //     }
+    // }
+
     public static class RelativeFrequencyReducer extends Reducer<Text, MapWritable, Text, FloatWritable> {
         private FloatWritable relativeFrequency = new FloatWritable();
         private float theta;
-        private Map<String, Integer> totalCounts = new HashMap<>();
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -130,9 +147,10 @@ public class NgramRF {
         Job job = Job.getInstance(conf, "N-gram Relative Frequency");
         job.setJarByClass(NgramRF.class);
         job.setMapperClass(TokenizerMapper.class);
+        // job.setCombinerClass(Combiner.class);
         job.setReducerClass(RelativeFrequencyReducer.class);
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(MapWritable.class);
+        job.setOutputValueClass(FloatWritable.class);
         FileInputFormat.addInputPath(job, new Path(args[1]));
         FileOutputFormat.setOutputPath(job, new Path(args[2]));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
