@@ -1,11 +1,9 @@
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.StringTokenizer;
 import java.util.ArrayList;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
@@ -21,31 +19,33 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 public class NgramRF {
 
     public static class InMapperCombiningNgramMapper extends Mapper<Object, Text, Text, MapWritable> {
-        private int ngramSize;
+        private int N;
         private Map<Text, MapWritable> intermediateMap;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            ngramSize = Integer.parseInt(conf.get("N"));
+            N = Integer.parseInt(conf.get("N"));
             intermediateMap = new HashMap<>();
         }
 
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            String line = value.toString();
-            StringTokenizer itr = new StringTokenizer(line);
+            String line = value.toString().replaceAll("['.]", " ");
+            String[] tokensArray = line.split("[^a-zA-Z0-9]+");
             ArrayList<String> tokens = new ArrayList<>();
 
             // Extract tokens, removing non-alphabetic characters
-            while (itr.hasMoreTokens()) {
-                tokens.add(itr.nextToken().replaceAll("[^a-zA-Z]", ""));
+            for (String token : tokensArray) {
+                if (!token.isEmpty()) {
+                    tokens.add(token);
+                }
             }
 
             // Iterate over the tokens to create n-grams
-            for (int i = 0; i <= tokens.size() - ngramSize; i++) {
+            for (int i = 0; i <= tokens.size() - N; i++) {
                 StringBuilder ngramBuilder = new StringBuilder();
-                for (int j = 1; j < ngramSize; j++) {
+                for (int j = 1; j < N; j++) {
                     if (j > 1) {
                         ngramBuilder.append(" ");
                     }
@@ -59,6 +59,7 @@ public class NgramRF {
                 Text prefixText = new Text(prefix);
                 MapWritable stripe = intermediateMap.getOrDefault(prefixText, new MapWritable());
                 Text followingWordsText = new Text(followingWords);
+                
                 IntWritable count = (IntWritable) stripe.getOrDefault(followingWordsText, new IntWritable(0));
                 count.set(count.get() + 1);
                 stripe.put(followingWordsText, count);
@@ -79,23 +80,6 @@ public class NgramRF {
             for (Map.Entry<Text, MapWritable> entry : intermediateMap.entrySet()) {
                 context.write(entry.getKey(), entry.getValue());
             }
-        }
-    }
-
-    public static class Combiner extends Reducer<Text, MapWritable, Text, MapWritable> {
-        @Override
-        public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
-            MapWritable combinedStripe = new MapWritable();
-            for (MapWritable stripe : values) {
-                for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
-                    Text nextWord = (Text) entry.getKey();
-                    IntWritable count = (IntWritable) entry.getValue();
-                    IntWritable combinedCount = (IntWritable) combinedStripe.getOrDefault(nextWord, new IntWritable(0));
-                    combinedCount.set(combinedCount.get() + count.get());
-                    combinedStripe.put(nextWord, combinedCount);
-                }
-            }
-            context.write(key, combinedStripe);
         }
     }
 
@@ -164,9 +148,8 @@ public class NgramRF {
         Job job = Job.getInstance(conf, "N-gram Relative Frequency");
         job.setJarByClass(NgramRF.class);
 
-        // Set Mapper, Combiner, and Reducer classes
+        // Set Mapper and Reducer classes
         job.setMapperClass(InMapperCombiningNgramMapper.class);
-        job.setCombinerClass(Combiner.class);
         job.setReducerClass(RelativeFrequencyReducer.class);
 
         // Set key/value classes for Mapper and Reducer outputs
@@ -181,3 +164,5 @@ public class NgramRF {
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 }
+
+
