@@ -1,16 +1,12 @@
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -19,140 +15,96 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class NgramRF {
 
-    public static class TokenizerMapper extends Mapper<Object, Text, Text, MapWritable> {
+    public static class NgramMapper extends Mapper<Object, Text, Text, IntWritable> {
+
+        private final static IntWritable one = new IntWritable(1);
         private int N;
-        private Map<String, MapWritable> ngramCounts = new HashMap<>();
-    
+        private Queue<String> words = new LinkedList<>();
+
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            N = Integer.parseInt(conf.get("N"));
+            N = conf.getInt("ngram.size", 2);
         }
-    
+
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
-            StringTokenizer itr = new StringTokenizer(line);
-            ArrayList<String> tokens = new ArrayList<>();
-    
-            while (itr.hasMoreTokens()) {
-                tokens.add(itr.nextToken().replaceAll("[^a-zA-Z]", ""));
-            }
+            String[] wordsOnThisLine = line.split("[^a-zA-Z0-9]+");
 
-            for (int i = 0; i <= tokens.size() - N; i++) {
-                StringBuilder ngramBuilder = new StringBuilder();
-                for (int j = 1; j < N; j++) {
-                    if (j > 0) {
-                        ngramBuilder.append(" ");
-                    }
-                    ngramBuilder.append(tokens.get(i + j));
+            for (String word : wordsOnThisLine) {
+                words.offer(word);
+                if (words.size() == N) {
+                    String ngramKey = String.join(" ", words);  // concatenate words in the queue to form an n-gram
+                    context.write(new Text(ngramKey), one); // record the n-gram
+                    String wordKey = words.poll() + " *";  // record the n-gram start by the first word
+                    context.write(new Text(wordKey), one);  //record the n-gram start by the first word
                 }
-    
-                String prefix = tokens.get(i);
-                String followingWords = ngramBuilder.toString();
-    
-                MapWritable stripe = ngramCounts.getOrDefault(prefix, new MapWritable());
-                Text followingWordsText = new Text(followingWords);
-                IntWritable count = (IntWritable) stripe.getOrDefault(followingWordsText, new IntWritable(0));
-                count.set(count.get() + 1);
-                stripe.put(followingWordsText, count);
-                ngramCounts.put(prefix, stripe);
-            }
-        }
-    
-        @Override
-        protected void cleanup(Context context) throws IOException, InterruptedException {
-            for (Map.Entry<String, MapWritable> entry : ngramCounts.entrySet()) {
-                MapWritable stripe = entry.getValue();
-                IntWritable totalCount = new IntWritable(0);
-                for (Map.Entry<Writable, Writable> followingEntry : stripe.entrySet()) {
-                    IntWritable count = (IntWritable) followingEntry.getValue();
-                    totalCount.set(totalCount.get() + count.get());
-                }
-                stripe.put(new Text("*"), totalCount);
-                Text prefixText = new Text(entry.getKey());
-                context.write(prefixText, stripe);
             }
         }
     }
 
-    // public static class Combiner extends Reducer<Text, MapWritable, Text, MapWritable> {
-    //     @Override
-    //     public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
-    //         MapWritable combinedStripe = new MapWritable();
-    //         for (MapWritable stripe : values) {
-    //             for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
-    //                 Text nextWord = (Text) entry.getKey();
-    //                 IntWritable count = (IntWritable) entry.getValue();
-    //                 IntWritable combinedCount = (IntWritable) combinedStripe.getOrDefault(nextWord, new IntWritable(0));
-    //                 combinedCount.set(combinedCount.get() + count.get());
-    //                 combinedStripe.put(nextWord, combinedCount);
-    //             }
-    //         }
-    //         context.write(key, combinedStripe);
-    //     }
-    // }
-
-    public static class RelativeFrequencyReducer extends Reducer<Text, MapWritable, Text, FloatWritable> {
-        private FloatWritable relativeFrequency = new FloatWritable();
-        private float theta;
+    public static class IntSumReducer extends Reducer<Text, IntWritable, Text, Text> {
+        private HashMap<String, Integer> totalCounts = new HashMap<>();
+        private double theta;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            theta = Float.parseFloat(conf.get("theta"));
+            theta = conf.getFloat("theta", 0.0f);
         }
 
-        public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
-            MapWritable aggregateStripe = new MapWritable();
-            int totalCount = 0;
+        //key: n-gram, value: count, 
+        public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException { 
+            String keyStr = key.toString();
+            int sum = 0;
 
-            // Aggregate all MapWritable stripes
-            for (MapWritable stripe : values) {
-                for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
-                    Text nextWord = (Text) entry.getKey();
-                    IntWritable count = (IntWritable) entry.getValue();
-                    if (nextWord.toString().equals("*")) {
-                        totalCount += count.get();
-                    } else {
-                        IntWritable currentCount = (IntWritable) aggregateStripe.getOrDefault(nextWord, new IntWritable(0));
-                        currentCount.set(currentCount.get() + count.get());
-                        aggregateStripe.put(nextWord, currentCount);
-                    }
-                }
+            for (IntWritable val : values) {        //sum up the values of the same key
+                sum += val.get();   
             }
 
-            // Calculate relative frequencies and write if frequency >= theta
-            for (Map.Entry<Writable, Writable> entry : aggregateStripe.entrySet()) {
-                Text nextWord = (Text) entry.getKey();
-                int count = ((IntWritable) entry.getValue()).get();
-                float frequency = (float) count / totalCount;
+            if (keyStr.endsWith(" *")) {
+                // the total no. of word count
+                String word = keyStr.split(" ")[0];     // get the first word
+                totalCounts.put(word, sum);     // record the total no. of word count
+            } else {
+                // the total no. of n-gram count
+                String firstWord = keyStr.split(" ")[0];
+                int totalCount = totalCounts.getOrDefault(firstWord, 1);
+                double relativeFrequency = (double) sum / totalCount;
 
-                if (frequency >= theta) {
-                    relativeFrequency.set(frequency);
-                    context.write(new Text(key.toString() + " " + nextWord.toString()), relativeFrequency);
+                if (relativeFrequency >= theta) {
+                    context.write(key, new Text(String.valueOf(relativeFrequency)));
                 }
             }
         }
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 5) {
-            System.err.println("Usage: hadoop jar [jarfile] [class name] [input dir] [output dir] [N] [theta]");
+        if (args.length != 4) {
+            System.err.println("Usage: NgramRF <input path> <output path> <N> <theta>");
+            System.exit(-1);
+        }
+
+        int N = Integer.parseInt(args[2]);
+        float theta = Float.parseFloat(args[3]);
+
+        if (theta < 0 || theta > 1) {
+            System.err.println("Theta must be between 0 and 1");
             System.exit(-1);
         }
 
         Configuration conf = new Configuration();
-        conf.set("N", args[3]);
-        conf.set("theta", args[4]);
-        Job job = Job.getInstance(conf, "N-gram Relative Frequency");
+        conf.setInt("ngram.size", N);
+        conf.setFloat("theta", theta);
+
+        Job job = Job.getInstance(conf, "N-gram relative frequency");
         job.setJarByClass(NgramRF.class);
-        job.setMapperClass(TokenizerMapper.class);
-        // job.setCombinerClass(Combiner.class);
-        job.setReducerClass(RelativeFrequencyReducer.class);
+        job.setMapperClass(NgramMapper.class);
+        job.setReducerClass(IntSumReducer.class);
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(FloatWritable.class);
-        FileInputFormat.addInputPath(job, new Path(args[1]));
-        FileOutputFormat.setOutputPath(job, new Path(args[2]));
+        job.setOutputValueClass(IntWritable.class);
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 }
