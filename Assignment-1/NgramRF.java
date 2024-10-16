@@ -8,6 +8,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -28,7 +29,7 @@ public class NgramRF {
         }
     
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            String line = value.toString().toLowerCase();
+            String line = value.toString();
             StringTokenizer itr = new StringTokenizer(line);
             ArrayList<String> tokens = new ArrayList<>();
     
@@ -60,12 +61,15 @@ public class NgramRF {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             for (Map.Entry<String, MapWritable> entry : ngramCounts.entrySet()) {
-                IntWritable totalCount = 0;
-                for (Map.Entry<Text, IntWritable> followingEntry : entry.entrySet()){
-                    totalCount.set(totalCount.get() + followingEntry.get());
+                MapWritable stripe = entry.getValue();
+                IntWritable totalCount = new IntWritable(0);
+                for (Map.Entry<Writable, Writable> followingEntry : stripe.entrySet()) {
+                    IntWritable count = (IntWritable) followingEntry.getValue();
+                    totalCount.set(totalCount.get() + count.get());
                 }
+                stripe.put(new Text("*"), totalCount);
                 Text prefixText = new Text(entry.getKey());
-                context.write(prefixText, entry.getValue().put("*", totalCount));
+                context.write(prefixText, stripe);
             }
         }
     }
@@ -73,38 +77,39 @@ public class NgramRF {
     public static class RelativeFrequencyReducer extends Reducer<Text, MapWritable, Text, FloatWritable> {
         private FloatWritable relativeFrequency = new FloatWritable();
         private float theta;
-    
+        private Map<String, Integer> totalCounts = new HashMap<>();
+
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             theta = Float.parseFloat(conf.get("theta"));
         }
-    
+
         public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
             MapWritable aggregateStripe = new MapWritable();
             int totalCount = 0;
-    
+
+            // Aggregate all MapWritable stripes
             for (MapWritable stripe : values) {
                 for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
                     Text nextWord = (Text) entry.getKey();
                     IntWritable count = (IntWritable) entry.getValue();
-    
-                    if (aggregateStripe.containsKey(nextWord)) {
-                        IntWritable currentCount = (IntWritable) aggregateStripe.get(nextWord);
-                        currentCount.set(currentCount.get() + count.get());
+                    if (nextWord.toString().equals("*")) {
+                        totalCount += count.get();
                     } else {
-                        aggregateStripe.put(nextWord, new IntWritable(count.get()));
+                        IntWritable currentCount = (IntWritable) aggregateStripe.getOrDefault(nextWord, new IntWritable(0));
+                        currentCount.set(currentCount.get() + count.get());
+                        aggregateStripe.put(nextWord, currentCount);
                     }
-    
-                    totalCount += count.get();
                 }
             }
-    
+
+            // Calculate relative frequencies and write if frequency >= theta
             for (Map.Entry<Writable, Writable> entry : aggregateStripe.entrySet()) {
                 Text nextWord = (Text) entry.getKey();
                 int count = ((IntWritable) entry.getValue()).get();
                 float frequency = (float) count / totalCount;
-    
+
                 if (frequency >= theta) {
                     relativeFrequency.set(frequency);
                     context.write(new Text(key.toString() + " " + nextWord.toString()), relativeFrequency);
@@ -127,7 +132,7 @@ public class NgramRF {
         job.setMapperClass(TokenizerMapper.class);
         job.setReducerClass(RelativeFrequencyReducer.class);
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(IntWritable.class);
+        job.setOutputValueClass(MapWritable.class);
         FileInputFormat.addInputPath(job, new Path(args[1]));
         FileOutputFormat.setOutputPath(job, new Path(args[2]));
         System.exit(job.waitForCompletion(true) ? 0 : 1);
