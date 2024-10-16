@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
@@ -20,57 +21,49 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 public class NgramRF {
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, MapWritable> {
-        private int N;
-        private Map<String, MapWritable> ngramCounts = new HashMap<>();
-    
+        private int ngramSize;
+
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            N = Integer.parseInt(conf.get("N"));
+            ngramSize = Integer.parseInt(conf.get("N"));
         }
-    
+
+        @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
             StringTokenizer itr = new StringTokenizer(line);
             ArrayList<String> tokens = new ArrayList<>();
-    
+
+            // Extract tokens, removing non-alphabetic characters
             while (itr.hasMoreTokens()) {
                 tokens.add(itr.nextToken().replaceAll("[^a-zA-Z]", ""));
             }
 
-            for (int i = 0; i <= tokens.size() - N; i++) {
+            // Iterate over the tokens to create n-grams
+            for (int i = 0; i <= tokens.size() - ngramSize; i++) {
                 StringBuilder ngramBuilder = new StringBuilder();
-                for (int j = 1; j < N; j++) {
-                    if (j > 0) {
+                for (int j = 1; j < ngramSize; j++) {
+                    if (j > 1) {
                         ngramBuilder.append(" ");
                     }
                     ngramBuilder.append(tokens.get(i + j));
                 }
-    
+
                 String prefix = tokens.get(i);
                 String followingWords = ngramBuilder.toString();
-    
-                MapWritable stripe = ngramCounts.getOrlDefaut(prefix, new MapWritable());
+
+                // Create stripe with followingWords and count
+                MapWritable stripe = new MapWritable();
                 Text followingWordsText = new Text(followingWords);
-                IntWritable count = (IntWritable) stripe.getOrDefault(followingWordsText, new IntWritable(0));
-                count.set(count.get() + 1);
+                IntWritable count = new IntWritable(1);
                 stripe.put(followingWordsText, count);
-                ngramCounts.put(prefix, stripe);
-            }
-        }
-    
-        @Override
-        protected void cleanup(Context context) throws IOException, InterruptedException {
-            for (Map.Entry<String, MapWritable> entry : ngramCounts.entrySet()) {
-                MapWritable stripe = entry.getValue();
-                IntWritable totalCount = new IntWritable(0);
-                for (Map.Entry<Writable, Writable> followingEntry : stripe.entrySet()) {
-                    IntWritable count = (IntWritable) followingEntry.getValue();
-                    totalCount.set(totalCount.get() + count.get());
-                }
-                stripe.put(new Text("*"), totalCount);
-                Text prefixText = new Text(entry.getKey());
-                context.write(prefixText, stripe);
+
+                // Add "*" to track the total number of n-grams that start with the prefix
+                stripe.put(new Text("*"), count);
+
+                // Emit prefix and stripe
+                context.write(new Text(prefix), stripe);
             }
         }
     }
@@ -102,11 +95,12 @@ public class NgramRF {
             theta = Float.parseFloat(conf.get("theta"));
         }
 
+        @Override
         public void reduce(Text key, Iterable<MapWritable> values, Context context) throws IOException, InterruptedException {
             MapWritable aggregateStripe = new MapWritable();
             int totalCount = 0;
 
-            // Aggregate all MapWritable stripes
+            // Aggregate all stripes
             for (MapWritable stripe : values) {
                 for (Map.Entry<Writable, Writable> entry : stripe.entrySet()) {
                     Text nextWord = (Text) entry.getKey();
@@ -121,7 +115,7 @@ public class NgramRF {
                 }
             }
 
-            // Calculate relative frequencies and write if frequency >= theta
+            // Calculate relative frequencies and emit results if frequency >= theta
             for (Map.Entry<Writable, Writable> entry : aggregateStripe.entrySet()) {
                 Text nextWord = (Text) entry.getKey();
                 int count = ((IntWritable) entry.getValue()).get();
@@ -156,12 +150,12 @@ public class NgramRF {
         Job job = Job.getInstance(conf, "N-gram Relative Frequency");
         job.setJarByClass(NgramRF.class); // Ensure Hadoop uses the correct jar with your class
     
+        // Set Mapper, Combiner, and Reducer classes
         job.setMapperClass(TokenizerMapper.class);
+        job.setCombinerClass(Combiner.class);
         job.setReducerClass(RelativeFrequencyReducer.class);
-    
-        // Optionally uncomment if the combiner is needed:
-        // job.setCombinerClass(Combiner.class);
-    
+
+        // Set key/value classes for Mapper and Reducer outputs
         job.setMapOutputKeyClass(Text.class);
         job.setMapOutputValueClass(MapWritable.class);
         job.setOutputKeyClass(Text.class);
