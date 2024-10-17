@@ -1,6 +1,9 @@
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.naming.Context;
+
 import java.util.ArrayList;
 
 import org.apache.hadoop.conf.Configuration;
@@ -144,7 +147,7 @@ public class NgramRF {
         Configuration conf = new Configuration();
         conf.set("N", args[2]);
         conf.set("theta", args[3]);
-    
+        conf.set("mapreduce.output.textoutputformat.separator", " ");
         Job job = Job.getInstance(conf, "N-gram Relative Frequency");
         job.setJarByClass(NgramRF.class);
 
