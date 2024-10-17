@@ -1,6 +1,8 @@
 import java.io.IOException;
 import java.util.StringTokenizer;
 
+import javax.naming.Context;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
@@ -46,6 +48,7 @@ public class WordLengthCount {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
+        conf.set("mapreduce.output.textoutputformat.separator", " ");
         Job job = Job.getInstance(conf, "word length count");
         job.setJarByClass(WordLengthCount.class);
         job.setMapperClass(TokenizerMapper.class);

@@ -1,6 +1,11 @@
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.naming.Context;
+
+import java.util.ArrayList;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
