@@ -35,7 +35,7 @@ public class NgramRF {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString().replaceAll("[^a-zA-Z0-9]+", " ");
-            String[] tokensArray = line.split("\\s+");
+            String[] tokensArray = line.trim().split("\\s+");
 
             for (int i = 0; i <= tokensArray.length - N; i++) {
                 StringBuilder ngramBuilder = new StringBuilder();
