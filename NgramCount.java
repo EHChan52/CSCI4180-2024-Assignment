@@ -34,8 +34,8 @@ public class NgramCount {
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString().replaceAll("[^a-zA-Z0-9]+", " ");
+            String[] tokensArray = line.trim().split("\\s+");
             ArrayList<String> tokens = new ArrayList<>();
-            String[] tokensArray = line.split("\\s+");
     
             for (String token : tokensArray) {
                 if (!token.isEmpty()) {
@@ -98,21 +98,14 @@ public class NgramCount {
                         context.write(new Text(cleanupKey.toString() + " " + nextWord.toString()), (IntWritable) entry.getValue());
                     }
         }
-        // @Override
-        // protected void cleanup(Context context) throws IOException, InterruptedException {
-        //     for (Map.Entry<Writable, Writable> entry : countMap.entrySet()) {
-        //         Text nextWord = (Text) entry.getKey();
-        //         // int outputCount = ((IntWritable) entry.getValue()).get();
-        //         context.write(new Text(cleanupKey.toString() + " " + nextWord.toString()), (IntWritable) entry.getValue());
-        //     }
-        // }
     }
 
     public static void main(String[] args) throws Exception {
-        Configuration conf = new Configuration();
         int N = Integer.parseInt(args[2]);
+        Configuration conf = new Configuration();
         conf.set("N", args[2]);
         conf.setInt("ngram.size", N);
+        conf.set("mapreduce.output.textoutputformat.separator", " ");
 
         Job job = Job.getInstance(conf, "N-gram count");
         job.setJarByClass(NgramCount.class); // later rename
