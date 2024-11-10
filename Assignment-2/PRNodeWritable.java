@@ -22,6 +22,13 @@ public class PRNodeWritable implements Writable {
         this.pageRankValueFixed = new BooleanWritable(false);
     }
 
+    public PRNodeWritableUpdate(IntWritable nodeID, FloatWritable pageRankValue, BooleanWritable pageRankValueFixed) {
+        this.nodeID = nodeID;
+        this.adjList = new MapWritable();
+        this.pageRankValue = pageRankValue;
+        this.pageRankValueFixed = new BooleanWritable(false);
+    }
+
     public void setNodeID(int nodeID) {
         this.nodeID = nodeID;
     }
@@ -38,21 +45,40 @@ public class PRNodeWritable implements Writable {
         return this.pageRankValue;
     }
 
-    @Override
-    public String toString() {
-        
+    public void setPageRankValueFixed(bool pageRankValueFixed) {
+        this.pageRankValueFixed = pageRankValueFixed;
     }
 
-    public static PRNodeWritable fromString(String str) {
+    public FloatWritable getPageRankValueFixed() {
+        return this.pageRankValueFixed;
+    }
+
+    @Override
+    public String toString() {
+        string adjListStr = " ";
+        for(Writable k: adjList.keySet()) {
+            adjListStr += ((IntWritable)k).get() + " ";
+        }
+        return "" + nodeID.get() + " " + pageRankValue.get() + " " + adjListStr; 
+    }
+
+    public static PRNodeWritable fromString() {
+    
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-        
+        nodeID.readFields(in);
+        adjList.readFields(in);
+        pageRankValue.readFields(in);
+        pageRankValueFixed.readFields(in);
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-        
+        nodeID.write(out);
+        adjList.write(out);
+        pageRankValue.write(out);
+        pageRankValueFixed.write(out);
     }
 }
