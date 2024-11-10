@@ -1,15 +1,19 @@
 package assg2;
 
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
 import java.io.IOException;
+import java.util.StringTokenizer;
 
 public class PRPreProcess {
     public class Graph{
@@ -39,6 +43,14 @@ public class PRPreProcess {
             adjacencyList.get(source).remove(
                 Integer.valueOf(destination));
         }
+        
+    }
+
+    public class CountMapper extends Mapper<>{
+
+    }
+
+    public class CountReducer extends Reducer<>{
         
     }
 
