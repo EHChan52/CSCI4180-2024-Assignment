@@ -16,54 +16,41 @@ import java.io.IOException;
 import java.util.StringTokenizer;
 
 public class PRPreProcess {
-    public class Graph{
-        private Map<Integer, List<Integer> > adjacencyList;
 
-        public Graph() {
-            adjacencyList = new HashMap<>();
-        }
+    public static class PreprocessMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
+        private IntWritable sourceNode = new IntWritable();
+        private IntWritable destinationNode = new IntWritable();
 
-        public void addVertex(int vertex){
-            adjacencyList.put(vertex, new ArrayList<>());
-        }
-
-        public void addEdge(int source, int destination){
-            adjacencyList.get(source).add(destination);
-        }
-        
-        public void removeVertex(int vertex){
-            adjacencyList.remove(vertex);
-            for (List<Integer> neighbors :
-                adjacencyList.values()) {
-                neighbors.remove(Integer.valueOf(vertex));
+        @Override
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            StringTokenizer itr = new StringTokenizer(value.toString());
+            if (itr.hasMoreTokens()) {
+                sourceNode.set(Integer.parseInt(itr.nextToken()));
+                if (itr.hasMoreTokens()) {
+                    destinationNode.set(Integer.parseInt(itr.nextToken()));
+                    // Skip the third token
+                    if (itr.hasMoreTokens()) {
+                        itr.nextToken();
+                    }
+                    context.write(sourceNode, destinationNode);
+                }
             }
         }
+    }
 
-        public void removeEdge(int source, int destination){
-            adjacencyList.get(source).remove(
-                Integer.valueOf(destination));
+    public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, PRNodeWritable> {
+        @Override
+        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            PRNodeWritable prNode = new PRNodeWritable();
+            prNode.setNodeID(key.get());
+            for (IntWritable val : values) {
+                prNode.getWholeAdjList().put(val, new IntWritable(1)); // Assuming weight is always 1
+            }
+            context.write(key, prNode);
         }
-        
     }
 
-    public class CountMapper extends Mapper<>{
-
-    }
-
-    public class CountReducer extends Reducer<>{
-        
-    }
-
-    public class PreprocessMapper extends Mapper<>{
-
-    }
-
-    public class PreprocessReducer extends Reducer<>{
-        
-    }
-
-    public static void main(String fileName) throws Exception {
-        Graph adjList = new Graph();
+    public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf, "PRProcess");
         job.setJarByClass(PRPreProcess.class);
@@ -71,9 +58,9 @@ public class PRPreProcess {
         job.setReducerClass(PreprocessReducer.class);
 
         job.setOutputKeyClass(IntWritable.class);
-        //job.setOutputValueClass(ArrayWritable.class);
+        job.setOutputValueClass(PRNodeWritable.class);
 
-        FileInputFormat.addInputPath(job, new Path(fileName));
+        FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
         System.exit(job.waitForCompletion(true) ? 0 : 1);

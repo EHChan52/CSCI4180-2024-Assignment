@@ -22,7 +22,7 @@ public class PRNodeWritable implements Writable {
         this.pageRankValueFixed = new BooleanWritable(false);
     }
 
-    public PRNodeWritableUpdate(IntWritable nodeID, FloatWritable pageRankValue, BooleanWritable pageRankValueFixed) {
+    public PRNodeWritableUpdate(IntWritable nodeID, FloatWritable pageRankValue) {
         this.nodeID = nodeID;
         this.adjList = new MapWritable();
         this.pageRankValue = pageRankValue;
@@ -53,6 +53,14 @@ public class PRNodeWritable implements Writable {
         return this.pageRankValueFixed;
     }
 
+    public void setWholeAdjList(MapWritable adjList) {
+        this.adjList = adjList;
+    }
+
+    public MapWritable getWholeAdjList() {
+        return this.adjList;
+    }
+
     @Override
     public String toString() {
         string adjListStr = " ";
@@ -62,8 +70,16 @@ public class PRNodeWritable implements Writable {
         return "" + nodeID.get() + " " + pageRankValue.get() + " " + adjListStr; 
     }
 
-    public static PRNodeWritable fromString() {
-    
+    public static PRNodeWritable fromString(String str) {
+        String[] parts = str.split(" ");
+        //parts[0] is the starting node,parts[1] is the ending node, parts[2] is the weight
+        PRNodeWritable prNode = new PRNodeWritable();
+        prNode.setNodeID(Integer.parseInt(parts[0]));
+        //put parts[0] to parts[1] in adjList
+        for(int i = 2; i < parts.length; i++) {
+            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[0])), new IntWritable(Integer.parseInt(parts[1])));
+        }
+        return prNode;
     }
 
     @Override
