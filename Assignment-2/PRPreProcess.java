@@ -39,6 +39,7 @@ public class PRPreProcess {
     }
 
     public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, PRNodeWritable> {
+        private int nodeCount = 0;
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             PRNodeWritable prNode = new PRNodeWritable();
@@ -47,6 +48,13 @@ public class PRPreProcess {
                 prNode.getWholeAdjList().put(val, new IntWritable(1)); // Assuming weight is always 1
             }
             context.write(key, prNode);
+            nodeCount++;
+        }
+
+        @Override
+        protected void cleanup(Context context) throws IOException, InterruptedException {
+            Configuration conf = context.getConfiguration();
+            conf.setInt("numNodes", nodeCount);
         }
     }
 
