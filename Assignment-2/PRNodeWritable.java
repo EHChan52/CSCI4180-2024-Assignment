@@ -22,7 +22,7 @@ public class PRNodeWritable implements Writable {
         this.pageRankValueFixed = new BooleanWritable(false);
     }
 
-    public PRNodeWritableUpdate(IntWritable nodeID, FloatWritable pageRankValue) {
+    public PRNodeWritable(IntWritable nodeID, FloatWritable pageRankValue) {
         this.nodeID = nodeID;
         this.adjList = new MapWritable();
         this.pageRankValue = pageRankValue;
@@ -30,7 +30,7 @@ public class PRNodeWritable implements Writable {
     }
 
     public void setNodeID(int nodeID) {
-        this.nodeID = nodeID;
+        this.nodeID.set(nodeID);
     }
 
     public IntWritable getNodeID() {
@@ -38,18 +38,18 @@ public class PRNodeWritable implements Writable {
     }
 
     public void setPageRankValue(float pageRankValue) {
-        this.pageRankValue = pageRankValue;
+        this.pageRankValue.set(pageRankValue);
     }
 
     public FloatWritable getPageRankValue() {
         return this.pageRankValue;
     }
 
-    public void setPageRankValueFixed(bool pageRankValueFixed) {
-        this.pageRankValueFixed = pageRankValueFixed;
+    public void setPageRankValueFixed(boolean pageRankValueFixed) {
+        this.pageRankValueFixed.set(pageRankValueFixed);
     }
 
-    public FloatWritable getPageRankValueFixed() {
+    public BooleanWritable getPageRankValueFixed() {
         return this.pageRankValueFixed;
     }
 
@@ -63,7 +63,7 @@ public class PRNodeWritable implements Writable {
 
     @Override
     public String toString() {
-        string adjListStr = " ";
+        String adjListStr = " ";
         for(Writable k: adjList.keySet()) {
             adjListStr += ((IntWritable)k).get() + " ";
         }
@@ -72,12 +72,10 @@ public class PRNodeWritable implements Writable {
 
     public static PRNodeWritable fromString(String str) {
         String[] parts = str.split(" ");
-        //parts[0] is the starting node,parts[1] is the ending node, parts[2] is the weight
         PRNodeWritable prNode = new PRNodeWritable();
         prNode.setNodeID(Integer.parseInt(parts[0]));
-        //put parts[0] to parts[1] in adjList
         for(int i = 2; i < parts.length; i++) {
-            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[0])), new IntWritable(Integer.parseInt(parts[1])));
+            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new IntWritable(1));
         }
         return prNode;
     }
