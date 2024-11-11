@@ -1,4 +1,4 @@
-package assg2;
+package assg2p2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -38,15 +38,17 @@ public class PRPreProcess {
         }
     }
 
-    public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, PRNodeWritable> {
+    public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, Text> {
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            PRNodeWritable prNode = new PRNodeWritable();
-            prNode.setNodeID(key.get());
+            StringBuilder adjListStr = new StringBuilder();
             for (IntWritable val : values) {
-                prNode.getWholeAdjList().put(val, new IntWritable(1)); // Assuming weight is always 1
+                if (adjListStr.length() > 0) {
+                    adjListStr.append(" ");
+                }
+                adjListStr.append(val.get());
             }
-            context.write(key, prNode);
+            context.write(key, new Text(adjListStr.toString()));
         }
     }
 
@@ -57,8 +59,13 @@ public class PRPreProcess {
         job.setMapperClass(PreprocessMapper.class);
         job.setReducerClass(PreprocessReducer.class);
 
+        // Set the output key and value classes for the mapper
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(IntWritable.class);
+
+        // Set the output key and value classes for the reducer
         job.setOutputKeyClass(IntWritable.class);
-        job.setOutputValueClass(PRNodeWritable.class);
+        job.setOutputValueClass(Text.class);
 
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
