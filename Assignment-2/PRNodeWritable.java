@@ -1,28 +1,28 @@
-package assg2;
+package assg2p2;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.BooleanWritable;
 
 public class PRNodeWritable implements Writable {
     private IntWritable nodeID;
     private MapWritable adjList;
-    private FloatWritable pageRankValue;
+    private DoubleWritable pageRankValue;
     private BooleanWritable pageRankValueFixed;
 
     public PRNodeWritable(){
         this.nodeID = new IntWritable();
         this.adjList = new MapWritable();
-        this.pageRankValue = new FloatWritable(Float.NEGATIVE_INFINITY);
+        this.pageRankValue = new DoubleWritable(Float.NEGATIVE_INFINITY);
         this.pageRankValueFixed = new BooleanWritable(false);
     }
 
-    public PRNodeWritable(IntWritable nodeID, FloatWritable pageRankValue) {
+    public PRNodeWritable(IntWritable nodeID, DoubleWritable pageRankValue) {
         this.nodeID = nodeID;
         this.adjList = new MapWritable();
         this.pageRankValue = pageRankValue;
@@ -41,7 +41,7 @@ public class PRNodeWritable implements Writable {
         this.pageRankValue.set(pageRankValue);
     }
 
-    public FloatWritable getPageRankValue() {
+    public DoubleWritable getPageRankValue() {
         return this.pageRankValue;
     }
 
@@ -63,18 +63,21 @@ public class PRNodeWritable implements Writable {
 
     @Override
     public String toString() {
-        String adjListStr = " ";
-        for(Writable k: adjList.keySet()) {
-            adjListStr += ((IntWritable)k).get() + " ";
+        StringBuilder adjListStr = new StringBuilder();
+        for (Writable k : adjList.keySet()) {
+            if (adjListStr.length() > 0) {
+                adjListStr.append(" ");
+            }
+            adjListStr.append(((IntWritable) k).get());
         }
-        return "" + nodeID.get() + " " + pageRankValue.get() + " " + adjListStr; 
+        return adjListStr.toString();
     }
 
     public static PRNodeWritable fromString(String str) {
         String[] parts = str.split(" ");
         PRNodeWritable prNode = new PRNodeWritable();
         prNode.setNodeID(Integer.parseInt(parts[0]));
-        for(int i = 2; i < parts.length; i++) {
+        for (int i = 2; i < parts.length; i++) {
             prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new IntWritable(1));
         }
         return prNode;
