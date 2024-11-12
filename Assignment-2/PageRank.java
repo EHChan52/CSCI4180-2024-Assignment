@@ -1,4 +1,10 @@
-package assg2;
+package assg2p2;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class PageRank{
     public static void main(String[] args) throws Exception {
@@ -16,7 +22,8 @@ public class PageRank{
         conf.set("alpha", args[0]);
         conf.set("iterationMax", args[1]);
         conf.set("threshold", args[2]);
-
+        
+        Job job = Job.getInstance(conf, "PageRank");
         FileInputFormat.addInputPath(job, new Path(args[3]));
         
         PRPreProcess.main(new String[]{args[3], args[4]});
