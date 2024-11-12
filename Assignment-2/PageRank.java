@@ -26,7 +26,10 @@ public class PageRank{
         Job job = Job.getInstance(conf, "PageRank");
         FileInputFormat.addInputPath(job, new Path(args[3]));
         
-        PRPreProcess.main(new String[]{args[3], args[4]});
+        //declare a new variable to store the output of the first mapreduce job
+        String outputPRP = new String("/tmp/PRPreProcess");
+        //output is redirected to another mapreduce job
+        PRPreProcess.main(new String[]{args[3], outputPRP});
         
 
         //pagerank loop
