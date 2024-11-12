@@ -31,6 +31,8 @@ public class PageRank{
         //output is redirected to another mapreduce job
         PRPreProcess.main(new String[]{args[3], outputPRP});
         
+        //declare an integer variable to store the value of numNodes in PRPreProcess
+        int numNodes = conf.getInt("numNodes", 0);
 
         //pagerank loop
         while(i <= iterationMax){
