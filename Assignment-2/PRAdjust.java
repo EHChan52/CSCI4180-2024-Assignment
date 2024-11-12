@@ -24,6 +24,7 @@ public class PRAdjust {
             Configuration conf = context.getConfiguration();
             alpha = Float.parseFloat(conf.get("alpha"));
             numNodes = Integer.parseInt(conf.get("numNodes"));
+            threshold = Float.parseFloat(conf.get("threshold"));
         }
 
         public void map(IntWritable key, PRNodeWritable value, IntWritable missingMass, Context context) throws IOException, InterruptedException {
@@ -33,7 +34,9 @@ public class PRAdjust {
             if ( alpha != 0 && missingMass != 0) {
                adjustedRank = alpha * (1 / numNodes) + (1 - alpha) * (sum + missingMass/numNodes);
             }
-            context.write(key, adjustedRank);
+            if(adjustedRank > threshold){
+                context.write(key, adjustedRank);
+            }
         }
     }
     public static class PRAdjustReducer extends Reducer<IntWritable, DoubleWritable, Text, DoubleWritable> {
