@@ -15,6 +15,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
+import javax.naming.Context;
+
 public class PRPreProcess {
 
     public static class PreprocessMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
@@ -63,7 +65,8 @@ public class PRPreProcess {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-        Job job = Job.getInstance(conf, "PRProcess");
+        conf.set("mapreduce.output.textoutputformat.separator", " ");
+        Job job = Job.getInstance(conf, "PRProcessMain");
         job.setJarByClass(PRPreProcess.class);
         job.setMapperClass(PreprocessMapper.class);
         job.setReducerClass(PreprocessReducer.class);
