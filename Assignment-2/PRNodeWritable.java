@@ -61,6 +61,10 @@ public class PRNodeWritable implements Writable {
         return this.adjList;
     }
 
+    public BooleanWritable isNode() {
+        return this.adjList.size > 0;
+    }
+
     @Override
     public String toString() {
         StringBuilder adjListStr = new StringBuilder();
