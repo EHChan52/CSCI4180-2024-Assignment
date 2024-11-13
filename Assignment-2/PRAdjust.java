@@ -13,7 +13,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.IOException;
 
 public class PRAdjust {
-    public static class PRAdjustMapper extends Mapper<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable, DoubleWritable> {
+    public static class PRAdjustMapper extends Mapper<IntWritable, PRNodeWritable, IntWritable, IntWritable, DoubleWritable> {
         private IntWritable pID = new IntWritable();
         // private FloatWritable rank = new FloatWritable();
         private PRNodeWritable node = new PRNodeWritable();
@@ -22,9 +22,11 @@ public class PRAdjust {
         private int numPages;
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
+            Counter someCount = conf.getCounter(nodeCounter.CountersEnum.NUM_NODES);
+
             alpha = Float.parseFloat(conf.get("alpha"));
-            numNodes = Integer.parseInt(conf.get("numNodes"));
             threshold = Float.parseFloat(conf.get("threshold"));
+            numNodes =  someCount.getValue();
         }
 
         public void map(IntWritable key, PRNodeWritable value, IntWritable missingMass, Context context) throws IOException, InterruptedException {
@@ -44,6 +46,25 @@ public class PRAdjust {
         public void reduce(Text key, Iterable<IntWritable, DoubleWritable,> values, Context context) throws IOException, InterruptedException {
             context.write(key, new FloatWritable(adjustedRank));
         }
+    }
+
+    public static Configuration get PageRankConf( Configuration conf, Path inputPath, Path outputPath) {
+        Job PRAdjustJOb = Job.getInstance(conf, "PRAdjust");
+
+        PRAdjustJob.setJarByClass(PRAdjust.class);
+        PRAdjustJob.setMapperClass(PRAdjustMapper.class);
+        PRAdjustJob.setReducerClass(PRAdjustReducer.class);
+
+        PRAdjustJob.setMapOutputKeyClass(IntWritable.class);
+        PRAdjustJob.setMapOutputValueClass(DoubleWritable.class);
+
+        PRAdjustJob.setOutputKeyClass(Text.class);
+        PRAdjustJob.setOutputValueClass(DoubleWritable.class);
+
+        FileInputFormat.addInputPath(PRAdjustJob, inputPath);
+        FileOutputFormat.setOutputPath(PRAdjustJob, outputPath);
+
+        return PRAdjustJob.getConfiguration();
     }
     
 }

@@ -18,6 +18,11 @@ import java.util.StringTokenizer;
 import javax.naming.Context;
 
 public class PRPreProcess {
+    public static class nodeCounter{
+        public static enum CountersEnum {
+            NUM_NODES;
+        }
+      }
 
     public static class PreprocessMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
         private IntWritable sourceNode = new IntWritable();
@@ -41,7 +46,6 @@ public class PRPreProcess {
     }
 
     public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, Text> {
-        private int nodeCount = 0;
 
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
@@ -52,16 +56,13 @@ public class PRPreProcess {
                 }
                 adjListStr.append(val.get());
             }
-            nodeCount++;
             context.write(key, new Text(adjListStr.toString()));
+            context.getCounter(nodeCounter.CountersEnum.NUM_NODES).increment(1);
         }
 
-        @Override
-        protected void cleanup(Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            conf.setInt("numNodes", nodeCount);
-        }
     }
+
+
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
