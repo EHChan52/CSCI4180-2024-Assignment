@@ -61,7 +61,7 @@ public class PRAdjust {
         PRAdjustJob.setOutputKeyClass(Text.class);
         PRAdjustJob.setOutputValueClass(DoubleWritable.class);
 
-        // FileInputFormat.addInputPath(PRAdjustJob, inputPath);
+        FileInputFormat.addInputPath(PRAdjustJob, inputPath);
         FileOutputFormat.setOutputPath(PRAdjustJob, outputPath);
 
         return PRAdjustJob;
