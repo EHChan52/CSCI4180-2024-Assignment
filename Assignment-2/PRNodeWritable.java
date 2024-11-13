@@ -37,7 +37,7 @@ public class PRNodeWritable implements Writable {
         return this.nodeID;
     }
 
-    public void setPageRankValue(float pageRankValue) {
+    public void setPageRankValue(Double pageRankValue) {
         this.pageRankValue.set(pageRankValue);
     }
 
@@ -74,15 +74,16 @@ public class PRNodeWritable implements Writable {
             }
             adjListStr.append(((IntWritable) k).get());
         }
-        return adjListStr.toString();
+        return this.nodeID + " " + this.pageRankValue + " " + adjListStr.toString();
     }
 
     public static PRNodeWritable fromString(String str) {
         String[] parts = str.split(" ");
         PRNodeWritable prNode = new PRNodeWritable();
         prNode.setNodeID(Integer.parseInt(parts[0]));
+        prNode.setPageRankValue(Double.parseDouble(parts[1]));
         for (int i = 2; i < parts.length; i++) {
-            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new IntWritable(1));
+            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new DoubleWritable(1.0));
         }
         return prNode;
     }

@@ -1,29 +1,45 @@
 package assg2p2;
 
 import java.io.IOException;
-import java.sql.Driver;
 import java.util.Map;
 
 import javax.naming.Context;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
-import org.w3c.dom.Text;
 
 import assg2p2.PRNodeWritable;
 import assg2p2.PRPreProcess;
-import org.w3c.dom.css.Counter;
+import assg2p2.PRAdjust;
 
-public class PageRank{
+public class PageRank {
 
     public static class PageRankMapper extends Mapper<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
+        private double initialPRValue;
+        private int iteration;
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            Configuration conf = context.getConfiguration();
+            initialPRValue = conf.getDouble("initialPRValue", 0.0);
+            iteration = Integer.parseInt(conf.get("iteration"));
+        }
+
         @Override
         public void map(IntWritable key, PRNodeWritable value, Context context) throws IOException, InterruptedException {
             // Emit the node structure for the given key (so it remains in the graph)
@@ -32,10 +48,16 @@ public class PageRank{
             // Get the adjacency list as a MapWritable
             MapWritable adjList = value.getWholeAdjList();
             if (adjList.size() > 0) {
-                float contribution = value.getPageRankValue() / adjList.size();
+                Double contribution;
+                if (iteration == 1) {
+                    contribution = initialPRValue;
+                } else {
+                    contribution = value.getPageRankValue() / adjList.size();
+                }
+
                 for (Map.Entry<Writable, Writable> entry : adjList.entrySet()) {
                     IntWritable neighborID = (IntWritable) entry.getKey();
-                    PRNodeWritable contributionNode = new PRNodeWritable(neighborID.get(), new FloatWritable(contribution));
+                    PRNodeWritable contributionNode = new PRNodeWritable(neighborID.get(), new DoubleWritable(contribution));
                     context.write(neighborID, contributionNode);
                 }
             }
@@ -43,11 +65,16 @@ public class PageRank{
     }
 
     public static class PageRankReducer extends Reducer<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
+        public static enum RemainingMassCounter { 
+            R_MASS_COUNT 
+        };
+        private double remainingMass = 0.0;
+    
         @Override
         public void reduce(IntWritable key, Iterable<PRNodeWritable> values, Context context) throws IOException, InterruptedException {
             PRNodeWritable prNode = new PRNodeWritable();
-            float sumOfRank = 0.0f;
-
+            double sumOfRank = 0.0;
+    
             for (PRNodeWritable value : values) {
                 if (value.isNode()) {
                     // Preserve the structure of the node
@@ -58,12 +85,21 @@ public class PageRank{
                     sumOfRank += value.getPageRankValue();
                 }
             }
-
-            // Set the new PageRank value without random jump
+    
+            // Set the new PageRank value for the node
             prNode.setPageRankValue(sumOfRank);
-
+    
+            // Accumulate the total remaining mass
+            remainingMass += sumOfRank;
+    
             // Write the updated node with the new PageRank value
             context.write(key, prNode);
+        }
+    
+        @Override
+        protected void cleanup(Context context) throws IOException, InterruptedException {
+            // Here we can set the remaining mass as a counter or some variable in the context
+            context.getCounter(RemainingMassCounter.R_MASS_COUNT).increment((long) (remainingMass * 1e9));
         }
     }
 
@@ -93,57 +129,78 @@ public class PageRank{
 
         return prValueJob;
     }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 5) {
             System.err.println("Usage: hadoop jar [.jar file] PageRank [alpha] [iteration] [threshold] [infile] [outdir]");
             System.exit(-1);
         }
-        int i = 1;
-
+        
         float alpha = Float.parseFloat(args[0]);
         int iterationMax = Integer.parseInt(args[1]);
         float threshold = Float.parseFloat(args[2]);
-        
+    
         Configuration conf = new Configuration();
-        conf.set("alpha", alpha);
-        conf.set("iterationMax", iterationMax);
-        conf.set("threshold", threshold);
-        
-        //declare a new variable to store the output of the mapreduce jobs
-        String outputPRProcess = new String("/tmp/PRPreProcess");
-        String outputPRValue = new String("/tmp/PRValue");
-        String outputPRAdjust = new String("/tmp/PRAdjust");
-
-        //Jobs
-        Job prPreProcessJob = PRPreProcess.getPRPreProcessJob(conf, new Path(args[3]), new String[]{args[3], outputPRProcess});
-        Job prValueJob = getPRValueJob(conf, alpha, outputPRValue);
-
+        conf.setFloat("alpha", alpha);
+        conf.setInt("iterationMax", iterationMax);
+        conf.setFloat("threshold", threshold);
+    
+        Path inputPath = new Path(args[3]);
+        Path outputPathPRPreProcess = new Path(args[4] + "/PRPreProcess");
+        Path outputPathPRValue = new Path(args[4] + "/PRValue");
+        Path outputPathPRAdjust = new Path(args[4] + "/PRAdjust");
+    
+        // Job 1: Preprocess
+        Job prPreProcessJob = PRPreProcess.getPRPreProcessJob(conf, inputPath, outputPathPRPreProcess);
         prPreProcessJob.waitForCompletion(true);
-        Counter nodeCounter = prPreProcessJob.getCounters.findCounter(CountersClass.NodeCounter.NODE_COUNT);
-
-
-        //output is redirected to another mapreduce job
-        ControlledJob jControlPRPreprocess = new ControlledJob(prPreProcessJob.getConfiguration());
-        ControlledJob jControlPRValue = new ControlledJob(prValueJob.getConfiguration());
-
-        jControlPRPreprocess.setJob(prPreProcessJob);
-        jControlPRValue.setJob(prValueJob);
-
-        jControlPRValue.addDependingJob(jControlPRPreprocess);
-
-        //Job Control
-        JobControl jControl = new JobControl("PageRank");
-        jControl.addJob(jControlPRValue);
-
-        //pagerank loop
-        while(i <= iterationMax){
-            jControl.run();
-            i++;
+        Counter nodeCounter = prPreProcessJob.getCounters().findCounter(PRPreProcess.PreprocessReducer.NodeCounter.NODE_COUNT);
+        int numNodes = (int) nodeCounter.getValue();
+        conf.setInt("numNodes", numNodes);
+    
+        // Set initial PageRank value as 1/N
+        conf.setDouble("initialPRValue", 1.0 / numNodes);
+    
+        // Job Control for Iterative PageRank Computation
+        JobControl jobControl = new JobControl("PageRankJobControl");
+    
+        Path currentInputPath = outputPathPRPreProcess;
+        for (int i = 1; i <= iterationMax; i++) {
+            conf.setInt("iteration", i);
+    
+            // Job 2: PageRank Value Calculation
+            Job prValueJob = getPRValueJob(conf, currentInputPath, outputPathPRValue);
+            ControlledJob controlledPRValueJob = new ControlledJob(prValueJob.getConfiguration());
+            controlledPRValueJob.setJob(prValueJob);
+            jobControl.addJob(controlledPRValueJob);
+    
+            // Calculate missing Mass
+            Counters counters = prValueJob.getCounters();
+            long remainingMassLong = counters.findCounter(PageRankReducer.RemainingMassCounter.R_MASS_COUNT).getValue();
+            double remainingMass = remainingMassLong / 1e9;
+            conf.setDouble("missingMass", 1.0 - remainingMass);
+    
+            // Job 3: PageRank Adjustment (with Damping Factor)
+            Job prAdjustJob = PRAdjust.getPRAdjustJob(conf, outputPathPRValue, outputPathPRAdjust);
+            ControlledJob controlledPRAdjustJob = new ControlledJob(prAdjustJob.getConfiguration());
+            controlledPRAdjustJob.setJob(prAdjustJob);
+            
+            // Setting Job Dependencies
+            controlledPRAdjustJob.addDependingJob(controlledPRValueJob);
+            jobControl.addJob(controlledPRAdjustJob);
+    
+            currentInputPath = outputPathPRAdjust;  // Update the current input path to point to the adjusted values for the next iteration
         }
-        //Final output dir
-        //FileOutputFormat.setOutputPath(job, new Path(args[4]));
+    
+        // Execute Jobs
+        Thread jobControlThread = new Thread(jobControl);
+        jobControlThread.start();
+        while (!jobControl.allFinished()) {
+            Thread.sleep(1000);
+        }
+        if (jobControl.getFailedJobList().size() > 0) {
+            System.err.println("Some jobs failed during PageRank computation.");
+            System.exit(1);
+        }
         System.exit(0);
     }
-
-    
 }
