@@ -6,13 +6,18 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 
+
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
+
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
+import java.sql.Driver;
 import java.util.StringTokenizer;
 
 import javax.naming.Context;
@@ -40,48 +45,56 @@ public class PRPreProcess {
         }
     }
 
-    public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, Text> {
-        private int nodeCount = 0;
-
-        @Override
-        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            StringBuilder adjListStr = new StringBuilder();
-            for (IntWritable val : values) {
-                if (adjListStr.length() > 0) {
-                    adjListStr.append(" ");
-                }
-                adjListStr.append(val.get());
-            }
-            nodeCount++;
-            context.write(key, new Text(adjListStr.toString()));
-        }
-
-        @Override
-        protected void cleanup(Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            conf.setInt("numNodes", nodeCount);
+    public class CountersClass {
+        public static enum NodeCounter {
+            NODE_COUNT
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        Configuration conf = new Configuration();
-        conf.set("mapreduce.output.textoutputformat.separator", " ");
-        Job job = Job.getInstance(conf, "PRProcessMain");
-        job.setJarByClass(PRPreProcess.class);
-        job.setMapperClass(PreprocessMapper.class);
-        job.setReducerClass(PreprocessReducer.class);
+    public static class PreprocessReducer extends Reducer<IntWritable, IntWritable, IntWritable, PRNodeWritable> {
+
+        @Override
+        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            MapWritable adjList = new MapWritable(); // Instantiate adjList for each key
+
+            for (IntWritable val : values) {
+                adjList.put(val, new FloatWritable(0.0f)); // Adding neighbors to adjList
+            }
+
+            PRNodeWritable prNode = new PRNodeWritable();
+            prNode.setNodeID(key);
+            prNode.setWholeAdjList(adjList);
+            context.write(key, prNode);
+
+            // Increment the counter for each node processed
+            context.getCounter(CountersClass.NodeCounter.NODE_COUNT).increment(1);
+        }
+    }
+
+    public static Job getPRPreProcessJob(Configuration conf, Path inputPath, Path outputPath) throws IOException {
+        Job prPreprocessJob = Job.getInstance(conf, "PRPreProcess");
+
+        prPreprocessJob.setJarByClass(PRPreProcess.class);
+        prPreprocessJob.setMapperClass(PreprocessMapper.class);
+        prPreprocessJob.setReducerClass(PreprocessReducer.class);
+        prPreprocessJob.setNumReduceTasks(1);
 
         // Set the output key and value classes for the mapper
-        job.setMapOutputKeyClass(IntWritable.class);
-        job.setMapOutputValueClass(IntWritable.class);
+        prPreprocessJob.setMapOutputKeyClass(IntWritable.class);
+        prPreprocessJob.setMapOutputValueClass(IntWritable.class);
 
         // Set the output key and value classes for the reducer
-        job.setOutputKeyClass(IntWritable.class);
-        job.setOutputValueClass(Text.class);
+        prPreprocessJob.setOutputKeyClass(IntWritable.class);
+        prPreprocessJob.setOutputValueClass(PRNodeWritable.class);
 
-        FileInputFormat.addInputPath(job, new Path(args[0]));
-        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        // Set input and output format classes
+        prPreprocessJob.setInputFormatClass(TextInputFormat.class);
+        prPreprocessJob.setOutputFormatClass(TextOutputFormat.class);
 
-        System.exit(job.waitForCompletion(true) ? 0 : 1);
+        // Set input and output paths
+        FileInputFormat.addInputPath(prPreprocessJob, inputPath);
+        FileOutputFormat.setOutputPath(prPreprocessJob, outputPath);
+
+        return prPreprocessJob;
     }
 }

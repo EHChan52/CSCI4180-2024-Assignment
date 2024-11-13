@@ -1,6 +1,7 @@
 package assg2p2;
 
 import java.io.IOException;
+import java.sql.Driver;
 import java.util.Map;
 
 import javax.naming.Context;
@@ -8,19 +9,25 @@ import javax.naming.Context;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 import org.w3c.dom.Text;
 
 import assg2p2.PRNodeWritable;
+import assg2p2.PRPreProcess;
+import org.w3c.dom.css.Counter;
 
 public class PageRank{
 
-    public static class PageRankMapper extends Mapper<Object, PRNodeWritable, IntWritable, PRNodeWritable> {
+    public static class PageRankMapper extends Mapper<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
         @Override
-        public void map(Object key, PRNodeWritable value, Context context) throws IOException, InterruptedException {
+        public void map(IntWritable key, PRNodeWritable value, Context context) throws IOException, InterruptedException {
             // Emit the node structure for the given key (so it remains in the graph)
-            context.write(new IntWritable(value.getNodeID()), value);
+            context.write(key, value);
             
             // Get the adjacency list as a MapWritable
             MapWritable adjList = value.getWholeAdjList();
@@ -59,6 +66,33 @@ public class PageRank{
             context.write(key, prNode);
         }
     }
+
+    public static Job getPRValueJob(Configuration conf, Path inputPath, Path outputPath) throws IOException {
+        Job prValueJob = Job.getInstance(conf, "PRValue");
+
+        prValueJob.setJarByClass(PageRank.class);
+        prValueJob.setMapperClass(PageRankMapper.class);
+        prValueJob.setReducerClass(PageRankReducer.class);
+        prValueJob.setNumReduceTasks(1);
+
+        // Set the output key and value classes for the mapper
+        prValueJob.setMapOutputKeyClass(IntWritable.class);
+        prValueJob.setMapOutputValueClass(PRNodeWritable.class);
+
+        // Set the output key and value classes for the reducer
+        prValueJob.setOutputKeyClass(IntWritable.class);
+        prValueJob.setOutputValueClass(PRNodeWritable.class);
+
+        // Set input and output format classes
+        prValueJob.setInputFormatClass(TextInputFormat.class);
+        prValueJob.setOutputFormatClass(TextOutputFormat.class);
+
+        // Set input and output paths
+        FileInputFormat.addInputPath(prValueJob, inputPath);
+        FileOutputFormat.setOutputPath(prValueJob, outputPath);
+
+        return prValueJob;
+    }
     public static void main(String[] args) throws Exception {
         if (args.length < 5) {
             System.err.println("Usage: hadoop jar [.jar file] PageRank [alpha] [iteration] [threshold] [infile] [outdir]");
@@ -70,50 +104,46 @@ public class PageRank{
         int iterationMax = Integer.parseInt(args[1]);
         float threshold = Float.parseFloat(args[2]);
         
-        Configuration confPRP = new Configuration();
-        //confPRP.set("alpha", args[0]);
-        confPRP.set("iterationMax", args[1]);
-        //confPRP.set("threshold", args[2]);
+        Configuration conf = new Configuration();
+        conf.set("alpha", alpha);
+        conf.set("iterationMax", iterationMax);
+        conf.set("threshold", threshold);
         
-        Job jobPRP = Job.getInstance(confPRP, "PRPreProcess");
-        FileInputFormat.addInputPath(jobPRP, new Path(args[3]));
-        
-        //declare a new variable to store the output of the first mapreduce job
-        String outputPRP = new String("/tmp/PRPreProcess");
+        //declare a new variable to store the output of the mapreduce jobs
+        String outputPRProcess = new String("/tmp/PRPreProcess");
+        String outputPRValue = new String("/tmp/PRValue");
+        String outputPRAdjust = new String("/tmp/PRAdjust");
+
+        //Jobs
+        Job prPreProcessJob = PRPreProcess.getPRPreProcessJob(conf, new Path(args[3]), new String[]{args[3], outputPRProcess});
+        Job prValueJob = getPRValueJob(conf, alpha, outputPRValue);
+
+        prPreProcessJob.waitForCompletion(true);
+        Counter nodeCounter = prPreProcessJob.getCounters.findCounter(CountersClass.NodeCounter.NODE_COUNT);
+
+
         //output is redirected to another mapreduce job
-        PRPreProcess.main(new String[]{args[3], outputPRP});
-        
-        //declare an integer variable to store the value of numNodes within PRPreProcess
-        int numNodes = confPRP.getInt("numNodes", 0);
+        ControlledJob jControlPRPreprocess = new ControlledJob(prPreProcessJob.getConfiguration());
+        ControlledJob jControlPRValue = new ControlledJob(prValueJob.getConfiguration());
+
+        jControlPRPreprocess.setJob(prPreProcessJob);
+        jControlPRValue.setJob(prValueJob);
+
+        jControlPRValue.addDependingJob(jControlPRPreprocess);
+
+        //Job Control
+        JobControl jControl = new JobControl("PageRank");
+        jControl.addJob(jControlPRValue);
 
         //pagerank loop
         while(i <= iterationMax){
-            Configuration confPR = new Configuration();
-            confPR.set("mapreduce.output.textoutputformat.separator", " ");
-            confPR.set("outdir", args[4]);
-            confPR.set("PRvalueoutdir", "/tmp/PRValue" + i);
-
-            Job jobPR = Job.getInstance(confPR, "PageRank");
-            
-            jobPR.setJarByClass(PageRank.class);
-            jobPR.setMapperClass(PageRankMapper.class);
-            jobPR.setReducerClass(PageRankReducer.class);
-
-            // Set the output key and value classes for the mapper
-            jobPR.setMapOutputKeyClass(IntWritable.class);
-            jobPR.setMapOutputValueClass(PRNodeWritable.class);
-
-            // Set the output key and value classes for the reducer
-            jobPR.setOutputKeyClass(IntWritable.class);
-            jobPR.setOutputValueClass(PRNodeWritable.class);
-            
-            FileInputFormat.addInputPath(jobPR, new Path(outputPRP));
-            FileOutputFormat.setOutputPath(jobPR, new Path(new String("/tmp/PR-" + i)));
-            prJob.waitForCompletion(true);
+            jControl.run();
             i++;
         }
         //Final output dir
         //FileOutputFormat.setOutputPath(job, new Path(args[4]));
         System.exit(0);
     }
+
+    
 }
