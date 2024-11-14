@@ -21,10 +21,11 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat; // Add this import
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import assg2p2.PRNodeWritable;
-import assg2p2.PRPreProcess;
+import assg2p2.PRPreProcess.PreprocessMapper;
+import assg2p2.PRPreProcess.PreprocessReducer;
 import assg2p2.PRAdjust;
 
 public class PageRank {

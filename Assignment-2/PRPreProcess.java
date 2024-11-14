@@ -14,6 +14,8 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 public class PRPreProcess {
@@ -27,8 +29,9 @@ public class PRPreProcess {
             StringTokenizer itr = new StringTokenizer(value.toString());
             if (itr.hasMoreTokens()) {
                 sourceNode.set(Integer.parseInt(itr.nextToken()));
-                while (itr.hasMoreTokens()) {
+                if (itr.hasMoreTokens()) {
                     destinationNode.set(Integer.parseInt(itr.nextToken()));
+                    // Ignore the third token (weight)
                     context.write(sourceNode, destinationNode);
                 }
             }
@@ -42,14 +45,18 @@ public class PRPreProcess {
 
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            Set<Integer> uniqueNeighbors = new HashSet<>();
+            for (IntWritable val : values) {
+                uniqueNeighbors.add(val.get());
+            }
+
             StringBuilder adjList = new StringBuilder();
             boolean first = true;
-
-            for (IntWritable val : values) {
+            for (Integer neighbor : uniqueNeighbors) {
                 if (!first) {
                     adjList.append(" ");
                 }
-                adjList.append(val.get());
+                adjList.append(neighbor);
                 first = false;
             }
 
