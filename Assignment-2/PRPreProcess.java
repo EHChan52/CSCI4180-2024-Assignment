@@ -33,6 +33,7 @@ public class PRPreProcess {
                     destinationNode.set(Integer.parseInt(itr.nextToken()));
                     // Ignore the third token (weight)
                     context.write(sourceNode, destinationNode);
+                    context.write(destinationNode, new IntWritable(-1)); // Mark destination node as non-dangling
                 }
             }
         }
@@ -46,8 +47,14 @@ public class PRPreProcess {
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
             Set<Integer> uniqueNeighbors = new HashSet<>();
+            boolean isDangling = true;
+
             for (IntWritable val : values) {
-                uniqueNeighbors.add(val.get());
+                if (val.get() != -1) {
+                    uniqueNeighbors.add(val.get());
+                } else {
+                    isDangling = false;
+                }
             }
 
             StringBuilder adjList = new StringBuilder();
@@ -60,7 +67,11 @@ public class PRPreProcess {
                 first = false;
             }
 
-            context.write(key, new Text(adjList.toString()));
+            if (isDangling) {
+                context.write(key, new Text("")); // Dangling node with empty adjacency list
+            } else {
+                context.write(key, new Text(adjList.toString()));
+            }
 
             // Increment the counter for each node processed
             context.getCounter(NodeCounter.NODE_COUNT).increment(1);
