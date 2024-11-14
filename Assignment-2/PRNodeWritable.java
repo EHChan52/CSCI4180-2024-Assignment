@@ -11,96 +11,69 @@ import org.apache.hadoop.io.BooleanWritable;
 
 public class PRNodeWritable implements Writable {
     private IntWritable nodeID;
-    private MapWritable adjList;
     private DoubleWritable pageRankValue;
-    private BooleanWritable pageRankValueFixed;
+    private MapWritable adjList;
+    private BooleanWritable isNode;
 
-    public PRNodeWritable(){
+    public PRNodeWritable() {
         this.nodeID = new IntWritable();
+        this.pageRankValue = new DoubleWritable();
         this.adjList = new MapWritable();
-        this.pageRankValue = new DoubleWritable(Float.NEGATIVE_INFINITY);
-        this.pageRankValueFixed = new BooleanWritable(false);
+        this.isNode = new BooleanWritable(true);
     }
 
     public PRNodeWritable(IntWritable nodeID, DoubleWritable pageRankValue) {
         this.nodeID = nodeID;
-        this.adjList = new MapWritable();
         this.pageRankValue = pageRankValue;
-        this.pageRankValueFixed = new BooleanWritable(false);
+        this.adjList = new MapWritable();
+        this.isNode = new BooleanWritable(false);
+    }
+
+    public IntWritable getNodeID() {
+        return nodeID;
     }
 
     public void setNodeID(IntWritable nodeID) {
         this.nodeID = nodeID;
     }
 
-    public IntWritable getNodeID() {
-        return this.nodeID;
+    public DoubleWritable getPageRankValue() {
+        return pageRankValue;
     }
 
     public void setPageRankValue(DoubleWritable pageRankValue) {
         this.pageRankValue = pageRankValue;
     }
 
-    public DoubleWritable getPageRankValue() {
-        return this.pageRankValue;
-    }
-
-    public void setPageRankValueFixed(BooleanWritable pageRankValueFixed) {
-        this.pageRankValueFixed = pageRankValueFixed;
-    }
-
-    public BooleanWritable getPageRankValueFixed() {
-        return this.pageRankValueFixed;
+    public MapWritable getWholeAdjList() {
+        return adjList;
     }
 
     public void setWholeAdjList(MapWritable adjList) {
         this.adjList = adjList;
     }
 
-    public MapWritable getWholeAdjList() {
-        return this.adjList;
-    }
-
     public BooleanWritable isNode() {
-        return new BooleanWritable(this.adjList.size() > 0);
+        return isNode;
     }
 
-    @Override
-    public String toString() {
-        StringBuilder adjListStr = new StringBuilder();
-        for (Writable k : adjList.keySet()) {
-            if (adjListStr.length() > 0) {
-                adjListStr.append(" ");
-            }
-            adjListStr.append(((IntWritable) k).get());
-        }
-        return this.nodeID + " " + this.pageRankValue + " " + adjListStr.toString();
-    }
-
-    public static PRNodeWritable fromString(String str) {
-        String[] parts = str.split(" ");
-        PRNodeWritable prNode = new PRNodeWritable();
-        prNode.setNodeID(new IntWritable(Integer.parseInt(parts[0])));
-        prNode.setPageRankValue(new DoubleWritable(Double.parseDouble(parts[1])));
-        for (int i = 2; i < parts.length; i++) {
-            prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new DoubleWritable(1.0));
-        }
-        return prNode;
-    }
-
-    @Override
-    public void readFields(DataInput in) throws IOException {
-        nodeID.readFields(in);
-        adjList.readFields(in);
-        pageRankValue.readFields(in);
-        pageRankValueFixed.readFields(in);
+    public void setIsNode(BooleanWritable isNode) {
+        this.isNode = isNode;
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
         nodeID.write(out);
-        adjList.write(out);
         pageRankValue.write(out);
-        pageRankValueFixed.write(out);
+        adjList.write(out);
+        isNode.write(out);
+    }
+
+    @Override
+    public void readFields(DataInput in) throws IOException {
+        nodeID.readFields(in);
+        pageRankValue.readFields(in);
+        adjList.readFields(in);
+        isNode.readFields(in);
     }
 }

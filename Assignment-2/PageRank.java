@@ -2,6 +2,7 @@ package assg2p2;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -9,6 +10,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -16,9 +18,10 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat; // Add this import
 
 import assg2p2.PRNodeWritable;
 import assg2p2.PRPreProcess;
@@ -26,7 +29,7 @@ import assg2p2.PRAdjust;
 
 public class PageRank {
 
-    public static class PageRankMapper extends Mapper<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
+    public static class PageRankMapper extends Mapper<Object, Text, IntWritable, PRNodeWritable> {
         private double initialPRValue;
         private int iteration;
 
@@ -38,18 +41,30 @@ public class PageRank {
         }
 
         @Override
-        public void map(IntWritable key, PRNodeWritable value, Context context) throws IOException, InterruptedException {
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            StringTokenizer itr = new StringTokenizer(value.toString());
+            IntWritable nodeID = new IntWritable(Integer.parseInt(itr.nextToken()));
+            DoubleWritable pageRankValue = new DoubleWritable(Double.parseDouble(itr.nextToken()));
+            MapWritable adjList = new MapWritable();
+            while (itr.hasMoreTokens()) {
+                adjList.put(new IntWritable(Integer.parseInt(itr.nextToken())), new DoubleWritable(0.0));
+            }
+
+            PRNodeWritable prNode = new PRNodeWritable();
+            prNode.setNodeID(nodeID);
+            prNode.setPageRankValue(pageRankValue);
+            prNode.setWholeAdjList(adjList);
+
             // Emit the node structure for the given key (so it remains in the graph)
-            context.write(key, value);
-            
+            context.write(nodeID, prNode);
+
             // Get the adjacency list as a MapWritable
-            MapWritable adjList = value.getWholeAdjList();
             if (adjList.size() > 0) {
                 double contribution;
                 if (iteration == 1) {
                     contribution = initialPRValue;
                 } else {
-                    contribution = value.getPageRankValue().get() / adjList.size();
+                    contribution = pageRankValue.get() / adjList.size();
                 }
 
                 for (Map.Entry<Writable, Writable> entry : adjList.entrySet()) {
@@ -117,7 +132,7 @@ public class PageRank {
         prValueJob.setOutputValueClass(PRNodeWritable.class);
 
         // Set input and output format classes
-        prValueJob.setInputFormatClass(SequenceFileInputFormat.class);
+        prValueJob.setInputFormatClass(TextInputFormat.class);
         prValueJob.setOutputFormatClass(SequenceFileOutputFormat.class);
 
         // Set input and output paths
@@ -149,7 +164,7 @@ public class PageRank {
     
         // Job 1: Preprocess
         Job prPreProcessJob = PRPreProcess.getPRPreProcessJob(conf, inputPath, outputPathPRPreProcess);
-        prPreProcessJob.setOutputFormatClass(SequenceFileOutputFormat.class); // Ensure the output is a SequenceFile
+        prPreProcessJob.setOutputFormatClass(TextOutputFormat.class); // Ensure the output is a Text file
         prPreProcessJob.waitForCompletion(true);
         Counter nodeCounter = prPreProcessJob.getCounters().findCounter(PRPreProcess.PreprocessReducer.NodeCounter.NODE_COUNT);
         int numNodes = (int) nodeCounter.getValue();
