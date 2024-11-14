@@ -27,9 +27,10 @@ public class PRAdjust {
             alpha = Float.parseFloat(conf.get("alpha"));
             threshold = Float.parseFloat(conf.get("threshold"));
             numNodes =  someCount.getValue();
+            missingMass = Double.parseDouble(conf.get("missingMass"));
         }
 
-        public void map(IntWritable key, PRNodeWritable value, IntWritable missingMass, Context context) throws IOException, InterruptedException {
+        public void map(IntWritable key, PRNodeWritable value, Context context) throws IOException, InterruptedException {
 
             DoubleWritable sum = value.getPageRankValue();
             DoubleWritable adjustedRank = sum;
@@ -37,14 +38,16 @@ public class PRAdjust {
                adjustedRank = alpha * (1 / numNodes) + (1 - alpha) * (sum + missingMass/numNodes);
             }
             if(adjustedRank > threshold){
-                context.write(key, adjustedRank);
+                value.setPageRankValue(adjustedRank);
+                context.write(key, value);
             }
         }
     }
-    public static class PRAdjustReducer extends Reducer<IntWritable, DoubleWritable, Text, DoubleWritable> {
+    public static class PRAdjustReducer extends Reducer<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
 
-        public void reduce(Text key, Iterable<IntWritable, DoubleWritable,> values, Context context) throws IOException, InterruptedException {
-            context.write(key, new FloatWritable(adjustedRank));
+        public void reduce(IntWritable key, Iterable< PRNodeWritable> values, Context context) throws IOException, InterruptedException {
+            
+            context.write(key,values);
         }
     }
 
