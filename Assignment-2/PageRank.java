@@ -172,8 +172,8 @@ public class PageRank {
         conf.setFloat("threshold", threshold);
 
         Path inputPath = new Path(args[3]);
-        Path outputPathPRPreProcess = new Path("PRPreProcess");
-        Path outputPathPRValue = new Path("PRValue");
+        Path outputPathPRPreProcess = new Path(args[4] + "/PRPreProcess");
+        Path outputPathPRValue = new Path(args[4] + "/PRValue");
         Path outputPathPRAdjust = new Path(args[4]);
 
         // Job 1: Preprocess
