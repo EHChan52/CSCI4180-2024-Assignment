@@ -192,12 +192,12 @@ public class PageRank {
             conf.setInt("iteration", i);
 
             // Job 2: PageRank Value Calculation
-            Job prValueJob = getPRValueJob(conf, currentInputPath, outputPathPRValue);
+            Job prValueJob = getPRValueJob(conf, currentInputPath, outputPathPRAdjust);
 
             // Delete the output path if it already exists
             FileSystem fs = FileSystem.get(conf);
-            if (fs.exists(outputPathPRValue)) {
-                fs.delete(outputPathPRValue, true);
+            if (fs.exists(outputPathPRAdjust)) {
+                fs.delete(outputPathPRAdjust, true);
             }
 
             prValueJob.waitForCompletion(true); // Ensure the job completes before accessing counters
@@ -209,7 +209,7 @@ public class PageRank {
             conf.setDouble("missingMass", 1.0 - remainingMass);
 
             // Job 3: PageRank Adjustment (with Damping Factor)
-            Job prAdjustJob = PRAdjust.getPRAdjustJob(conf, outputPathPRValue, outputPathPRAdjust);
+            Job prAdjustJob = PRAdjust.getPRAdjustJob(conf, outputPathPRAdjust, outputPathPRAdjust);
 
             // Delete the output path if it already exists
             if (fs.exists(outputPathPRAdjust)) {
