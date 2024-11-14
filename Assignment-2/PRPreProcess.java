@@ -2,32 +2,26 @@ package assg2p2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
-
-
+import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Counter;
-import org.apache.hadoop.mapreduce.Counters;
-
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
-import java.sql.Driver;
 import java.util.StringTokenizer;
 
-import javax.naming.Context;
-
 public class PRPreProcess {
-    public static class nodeCounter{
+    public static class nodeCounter {
         public static enum CountersEnum {
             NUM_NODES;
         }
-      }
+    }
 
     public static class PreprocessMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
         private IntWritable sourceNode = new IntWritable();
@@ -90,8 +84,8 @@ public class PRPreProcess {
         prPreprocessJob.setOutputValueClass(PRNodeWritable.class);
 
         // Set input and output format classes
-        prPreprocessJob.setInputFormatClass(TextInputFormat.class);
-        prPreprocessJob.setOutputFormatClass(TextOutputFormat.class);
+        prPreprocessJob.setInputFormatClass(org.apache.hadoop.mapreduce.lib.input.TextInputFormat.class);
+        prPreprocessJob.setOutputFormatClass(org.apache.hadoop.mapreduce.lib.output.TextOutputFormat.class);
 
         // Set input and output paths
         FileInputFormat.addInputPath(prPreprocessJob, inputPath);

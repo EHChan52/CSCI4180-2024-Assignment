@@ -29,24 +29,24 @@ public class PRNodeWritable implements Writable {
         this.pageRankValueFixed = new BooleanWritable(false);
     }
 
-    public void setNodeID(int nodeID) {
-        this.nodeID.set(nodeID);
+    public void setNodeID(IntWritable nodeID) {
+        this.nodeID = nodeID;
     }
 
     public IntWritable getNodeID() {
         return this.nodeID;
     }
 
-    public void setPageRankValue(Double pageRankValue) {
-        this.pageRankValue.set(pageRankValue);
+    public void setPageRankValue(DoubleWritable pageRankValue) {
+        this.pageRankValue = pageRankValue;
     }
 
     public DoubleWritable getPageRankValue() {
         return this.pageRankValue;
     }
 
-    public void setPageRankValueFixed(boolean pageRankValueFixed) {
-        this.pageRankValueFixed.set(pageRankValueFixed);
+    public void setPageRankValueFixed(BooleanWritable pageRankValueFixed) {
+        this.pageRankValueFixed = pageRankValueFixed;
     }
 
     public BooleanWritable getPageRankValueFixed() {
@@ -62,7 +62,7 @@ public class PRNodeWritable implements Writable {
     }
 
     public BooleanWritable isNode() {
-        return this.adjList.size > 0;
+        return new BooleanWritable(this.adjList.size() > 0);
     }
 
     @Override
@@ -80,8 +80,8 @@ public class PRNodeWritable implements Writable {
     public static PRNodeWritable fromString(String str) {
         String[] parts = str.split(" ");
         PRNodeWritable prNode = new PRNodeWritable();
-        prNode.setNodeID(Integer.parseInt(parts[0]));
-        prNode.setPageRankValue(Double.parseDouble(parts[1]));
+        prNode.setNodeID(new IntWritable(Integer.parseInt(parts[0])));
+        prNode.setPageRankValue(new DoubleWritable(Double.parseDouble(parts[1])));
         for (int i = 2; i < parts.length; i++) {
             prNode.adjList.put(new IntWritable(Integer.parseInt(parts[i])), new DoubleWritable(1.0));
         }

@@ -3,9 +3,8 @@ package assg2p2;
 import java.io.IOException;
 import java.util.Map;
 
-import javax.naming.Context;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.DoubleWritable;
@@ -17,9 +16,9 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 
@@ -48,16 +47,16 @@ public class PageRank {
             // Get the adjacency list as a MapWritable
             MapWritable adjList = value.getWholeAdjList();
             if (adjList.size() > 0) {
-                Double contribution;
+                double contribution;
                 if (iteration == 1) {
                     contribution = initialPRValue;
                 } else {
-                    contribution = value.getPageRankValue() / adjList.size();
+                    contribution = value.getPageRankValue().get() / adjList.size();
                 }
 
                 for (Map.Entry<Writable, Writable> entry : adjList.entrySet()) {
                     IntWritable neighborID = (IntWritable) entry.getKey();
-                    PRNodeWritable contributionNode = new PRNodeWritable(neighborID.get(), new DoubleWritable(contribution));
+                    PRNodeWritable contributionNode = new PRNodeWritable(neighborID, new DoubleWritable(contribution));
                     context.write(neighborID, contributionNode);
                 }
             }
@@ -76,18 +75,18 @@ public class PageRank {
             double sumOfRank = 0.0;
     
             for (PRNodeWritable value : values) {
-                if (value.isNode()) {
+                if (value.isNode().get()) {
                     // Preserve the structure of the node
                     prNode.setNodeID(value.getNodeID());
                     prNode.setWholeAdjList(value.getWholeAdjList());
                 } else {
                     // Accumulate contributions from neighbors
-                    sumOfRank += value.getPageRankValue();
+                    sumOfRank += value.getPageRankValue().get();
                 }
             }
     
             // Set the new PageRank value for the node
-            prNode.setPageRankValue(sumOfRank);
+            prNode.setPageRankValue(new DoubleWritable(sumOfRank));
     
             // Accumulate the total remaining mass
             remainingMass += sumOfRank;
@@ -120,8 +119,8 @@ public class PageRank {
         prValueJob.setOutputValueClass(PRNodeWritable.class);
 
         // Set input and output format classes
-        prValueJob.setInputFormatClass(TextInputFormat.class);
-        prValueJob.setOutputFormatClass(TextOutputFormat.class);
+        prValueJob.setInputFormatClass(SequenceFileInputFormat.class);
+        prValueJob.setOutputFormatClass(SequenceFileOutputFormat.class);
 
         // Set input and output paths
         FileInputFormat.addInputPath(prValueJob, inputPath);
@@ -152,6 +151,7 @@ public class PageRank {
     
         // Job 1: Preprocess
         Job prPreProcessJob = PRPreProcess.getPRPreProcessJob(conf, inputPath, outputPathPRPreProcess);
+        prPreProcessJob.setOutputFormatClass(SequenceFileOutputFormat.class); // Ensure the output is a SequenceFile
         prPreProcessJob.waitForCompletion(true);
         Counter nodeCounter = prPreProcessJob.getCounters().findCounter(PRPreProcess.PreprocessReducer.NodeCounter.NODE_COUNT);
         int numNodes = (int) nodeCounter.getValue();
@@ -169,9 +169,26 @@ public class PageRank {
     
             // Job 2: PageRank Value Calculation
             Job prValueJob = getPRValueJob(conf, currentInputPath, outputPathPRValue);
+            
+            // Delete the output path if it already exists
+            FileSystem fs = FileSystem.get(conf);
+            if (fs.exists(outputPathPRValue)) {
+                fs.delete(outputPathPRValue, true);
+            }
+            
             ControlledJob controlledPRValueJob = new ControlledJob(prValueJob.getConfiguration());
             controlledPRValueJob.setJob(prValueJob);
             jobControl.addJob(controlledPRValueJob);
+    
+            // Execute the job control to ensure the job completes before accessing counters
+            jobControl.run();
+            while (!controlledPRValueJob.isCompleted()) {
+                Thread.sleep(1000);
+            }
+            if (controlledPRValueJob.getJobState() != ControlledJob.State.SUCCESS) {
+                System.err.println("PRValue job failed.");
+                System.exit(1);
+            }
     
             // Calculate missing Mass
             Counters counters = prValueJob.getCounters();
@@ -181,6 +198,12 @@ public class PageRank {
     
             // Job 3: PageRank Adjustment (with Damping Factor)
             Job prAdjustJob = PRAdjust.getPRAdjustJob(conf, outputPathPRValue, outputPathPRAdjust);
+            
+            // Delete the output path if it already exists
+            if (fs.exists(outputPathPRAdjust)) {
+                fs.delete(outputPathPRAdjust, true);
+            }
+            
             ControlledJob controlledPRAdjustJob = new ControlledJob(prAdjustJob.getConfiguration());
             controlledPRAdjustJob.setJob(prAdjustJob);
             
@@ -188,12 +211,20 @@ public class PageRank {
             controlledPRAdjustJob.addDependingJob(controlledPRValueJob);
             jobControl.addJob(controlledPRAdjustJob);
     
+            // Execute the job control to ensure the job completes before proceeding
+            jobControl.run();
+            while (!controlledPRAdjustJob.isCompleted()) {
+                Thread.sleep(1000);
+            }
+            if (controlledPRAdjustJob.getJobState() != ControlledJob.State.SUCCESS) {
+                System.err.println("PRAdjust job failed.");
+                System.exit(1);
+            }
+    
             currentInputPath = outputPathPRAdjust;  // Update the current input path to point to the adjusted values for the next iteration
         }
     
         // Execute Jobs
-        Thread jobControlThread = new Thread(jobControl);
-        jobControlThread.start();
         while (!jobControl.allFinished()) {
             Thread.sleep(1000);
         }
