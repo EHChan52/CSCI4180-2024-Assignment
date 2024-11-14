@@ -19,8 +19,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
-import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 
 import assg2p2.PRNodeWritable;
 import assg2p2.PRPreProcess;
@@ -160,9 +158,6 @@ public class PageRank {
         // Set initial PageRank value as 1/N
         conf.setDouble("initialPRValue", 1.0 / numNodes);
     
-        // Job Control for Iterative PageRank Computation
-        JobControl jobControl = new JobControl("PageRankJobControl");
-    
         Path currentInputPath = outputPathPRPreProcess;
         for (int i = 1; i <= iterationMax; i++) {
             conf.setInt("iteration", i);
@@ -176,19 +171,7 @@ public class PageRank {
                 fs.delete(outputPathPRValue, true);
             }
             
-            ControlledJob controlledPRValueJob = new ControlledJob(prValueJob.getConfiguration());
-            controlledPRValueJob.setJob(prValueJob);
-            jobControl.addJob(controlledPRValueJob);
-    
-            // Execute the job control to ensure the job completes before accessing counters
-            jobControl.run();
-            while (!controlledPRValueJob.isCompleted()) {
-                Thread.sleep(1000);
-            }
-            if (controlledPRValueJob.getJobState() != ControlledJob.State.SUCCESS) {
-                System.err.println("PRValue job failed.");
-                System.exit(1);
-            }
+            prValueJob.waitForCompletion(true); // Ensure the job completes before accessing counters
     
             // Calculate missing Mass
             Counters counters = prValueJob.getCounters();
@@ -204,34 +187,11 @@ public class PageRank {
                 fs.delete(outputPathPRAdjust, true);
             }
             
-            ControlledJob controlledPRAdjustJob = new ControlledJob(prAdjustJob.getConfiguration());
-            controlledPRAdjustJob.setJob(prAdjustJob);
-            
-            // Setting Job Dependencies
-            controlledPRAdjustJob.addDependingJob(controlledPRValueJob);
-            jobControl.addJob(controlledPRAdjustJob);
-    
-            // Execute the job control to ensure the job completes before proceeding
-            jobControl.run();
-            while (!controlledPRAdjustJob.isCompleted()) {
-                Thread.sleep(1000);
-            }
-            if (controlledPRAdjustJob.getJobState() != ControlledJob.State.SUCCESS) {
-                System.err.println("PRAdjust job failed.");
-                System.exit(1);
-            }
+            prAdjustJob.waitForCompletion(true); // Ensure the job completes before proceeding
     
             currentInputPath = outputPathPRAdjust;  // Update the current input path to point to the adjusted values for the next iteration
         }
     
-        // Execute Jobs
-        while (!jobControl.allFinished()) {
-            Thread.sleep(1000);
-        }
-        if (jobControl.getFailedJobList().size() > 0) {
-            System.err.println("Some jobs failed during PageRank computation.");
-            System.exit(1);
-        }
         System.exit(0);
     }
 }

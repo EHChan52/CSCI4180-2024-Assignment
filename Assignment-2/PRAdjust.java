@@ -4,13 +4,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import java.io.IOException;
 
@@ -39,7 +40,15 @@ public class PRAdjust {
         }
     }
 
-    public static class PRAdjustReducer extends Reducer<IntWritable, PRNodeWritable, IntWritable, PRNodeWritable> {
+    public static class PRAdjustReducer extends Reducer<IntWritable, PRNodeWritable, Text, Text> {
+        private float threshold;
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            Configuration conf = context.getConfiguration();
+            threshold = conf.getFloat("threshold", 0.001f);
+        }
+
         @Override
         public void reduce(IntWritable key, Iterable<PRNodeWritable> values, Context context) throws IOException, InterruptedException {
             PRNodeWritable adjustedNode = new PRNodeWritable();
@@ -50,7 +59,9 @@ public class PRAdjust {
                 adjustedNode.setWholeAdjList(val.getWholeAdjList());
             }
             adjustedNode.setPageRankValue(new DoubleWritable(adjustedRank));
-            context.write(key, adjustedNode);
+            if (adjustedRank > threshold) {
+                context.write(new Text(adjustedNode.getNodeID().toString()), new Text(Double.toString(adjustedRank)));
+            }
         }
     }
 
@@ -64,11 +75,11 @@ public class PRAdjust {
         prAdjustJob.setMapOutputKeyClass(IntWritable.class);
         prAdjustJob.setMapOutputValueClass(PRNodeWritable.class);
 
-        prAdjustJob.setOutputKeyClass(IntWritable.class);
-        prAdjustJob.setOutputValueClass(PRNodeWritable.class);
+        prAdjustJob.setOutputKeyClass(Text.class);
+        prAdjustJob.setOutputValueClass(Text.class);
 
         prAdjustJob.setInputFormatClass(SequenceFileInputFormat.class);
-        prAdjustJob.setOutputFormatClass(SequenceFileOutputFormat.class);
+        prAdjustJob.setOutputFormatClass(TextOutputFormat.class);
 
         FileInputFormat.addInputPath(prAdjustJob, inputPath);
         FileOutputFormat.setOutputPath(prAdjustJob, outputPath);
