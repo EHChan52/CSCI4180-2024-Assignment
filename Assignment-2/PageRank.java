@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import javax.naming.Context;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -170,6 +168,7 @@ public class PageRank {
         FileSystem fs = FileSystem.get(conf);
         if (fs.exists(outputPathPRValue)) {
             fs.delete(outputPathPRValue, true);
+        }
         if (fs.exists(outputPathPRAdjust)) {
             fs.delete(outputPathPRAdjust, true);
         }
@@ -193,7 +192,6 @@ public class PageRank {
             Job prValueJob = getPRValueJob(conf, currentInputPath, outputPathPRValue);
             
             // Delete the output path if it already exists
-            FileSystem fs = FileSystem.get(conf);
             if (fs.exists(outputPathPRValue)) {
                 fs.delete(outputPathPRValue, true);
             }
@@ -220,7 +218,5 @@ public class PageRank {
         }
         
         System.exit(0);
-
-    }
     }
 }
