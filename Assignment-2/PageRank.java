@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import javax.naming.Context;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -132,8 +134,12 @@ public class PageRank {
         prValueJob.setOutputKeyClass(IntWritable.class);
         prValueJob.setOutputValueClass(PRNodeWritable.class);
 
-        // Set input and output format classes
-        prValueJob.setInputFormatClass(TextInputFormat.class);
+        // Change input format to match the output format of previous job
+        if (conf.getInt("iteration", 1) == 1) {
+            prValueJob.setInputFormatClass(TextInputFormat.class);
+        } else {
+            prValueJob.setInputFormatClass(SequenceFileInputFormat.class);
+        }
         prValueJob.setOutputFormatClass(SequenceFileOutputFormat.class);
 
         // Set input and output paths
