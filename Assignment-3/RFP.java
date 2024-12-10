@@ -1,14 +1,14 @@
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
 public class RFP {
     public void generateChunks(int windowSize, int modulus, int maxSize, File fileToUpload) {
         System.out.println("Hello from"+ fileToUpload);
-        List <Chunk> chunks = null;
         int d = 257;
-
+        int[] fingerprint = new int[windowSize];
+        
         //copy
+
         File copy = 
         new File(fileToUpload.getParent(), "copy_" + fileToUpload.getName());
         try {
@@ -21,11 +21,15 @@ public class RFP {
             fileContent = java.nio.file.Files.readAllBytes(copy.toPath());
         } catch (IOException e) {
         }
+        //binary content debug
         if (fileContent != null) {
             for (int i = 0; i < 1; i++) {
-            System.out.print(fileContent[i]);
+            System.out.println(fileContent[i]);
             }
         }
+
+
+        //chunks.set(0, fileContent[0]);
             
         /* 
         for(int i = 1; i <= windowSize; i++){
