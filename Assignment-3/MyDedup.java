@@ -27,9 +27,9 @@ class MyDedup {
 
         if("upload".equals(args[0]) && args.length == 5){
             try {
-                int minChunkSize = Integer.parseInt(args[1]);
-                int avgChunkSize = Integer.parseInt(args[2]);
-                int maxChunkSize = Integer.parseInt(args[3]);
+                int minChunkSize = Integer.parseInt(args[1]); //windowsize
+                int avgChunkSize = Integer.parseInt(args[2]); //modulas
+                int maxChunkSize = Integer.parseInt(args[3]); 
 
                 if (!isPowerOfTwo(minChunkSize) || !isPowerOfTwo(avgChunkSize) || !isPowerOfTwo(maxChunkSize)) {
                     System.out.println("Error: min_chunk, avg_chunk and max_chunk must be powers of 2.");
@@ -39,10 +39,16 @@ class MyDedup {
                     if (!fileToUpload.exists()) {
                         System.out.println("Error: File " + args[4] + " does not exist.");
                     } 
+                    //if file is null, error;
+                    else if (fileToUpload.length() == 0) {
+                        System.out.println("Error: File " + args[4] + " is empty.");
+                    }
                     else {
                         System.out.println("File " + args[4] + " exists. Proceeding with upload.");
                         RFP rfp = new RFP();
-                        rfp.generateFingerprints(minChunkSize,avgChunkSize,fileToUpload);
+                        int[] fingerprints = rfp.generateFingerprints(minChunkSize, avgChunkSize, fileToUpload);
+                        Anchoring anchoring = new Anchoring();
+                        int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize);
                     }
                 }
             } catch (NumberFormatException e) {

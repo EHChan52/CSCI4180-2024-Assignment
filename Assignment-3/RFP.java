@@ -21,6 +21,8 @@ public class RFP {
             for (int i = 1; i <= fileContent.length - windowSize; i++) {
                 //binary content debug
                 //System.out.println(fileContent[i]);
+
+                //have bug(have not check)
                 fingerprint[i] = (d * (fingerprint[i - 1] - (int)(Math.pow(d, windowSize - 1) % modulus) * (int)fileContent[i]) + (int)fileContent[i + windowSize - 1]) % modulus;
                 if (fingerprint[i] < 0) {
                     fingerprint[i] += modulus;
@@ -28,12 +30,12 @@ public class RFP {
             }
 
             //printout all fingerprints
-            /* 
+            /* -
             for(int i = 0; i < fingerprint.length; i++){
                 System.out.println(fingerprint[i]);
             }
             */
-            
+
             return fingerprint;
         }
         else{
