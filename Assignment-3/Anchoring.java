@@ -22,6 +22,7 @@ public class Anchoring {
                 anchor[anchorCount] = i;
                 anchorCount++;
                 chunkLength = 0;
+                i = i + windowSize - 1;
             }
             else if ((RFP[i] & mask) == 0) {
                 anchor[anchorCount] = i;
