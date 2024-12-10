@@ -42,7 +42,7 @@ class MyDedup {
                     else {
                         System.out.println("File " + args[4] + " exists. Proceeding with upload.");
                         RFP rfp = new RFP();
-                        rfp.generateChunks(minChunkSize,avgChunkSize,maxChunkSize,fileToUpload);
+                        rfp.generateFingerprints(minChunkSize,avgChunkSize,fileToUpload);
                     }
                 }
             } catch (NumberFormatException e) {
