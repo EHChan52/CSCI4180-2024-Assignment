@@ -32,7 +32,7 @@ class MyDedup {
                 int maxChunkSize = Integer.parseInt(args[3]);
 
                 if (!isPowerOfTwo(minChunkSize) || !isPowerOfTwo(avgChunkSize) || !isPowerOfTwo(maxChunkSize)) {
-                    System.out.println("Error: min_chunk, avg_chunk, and max_chunk must be powers of 2.");
+                    System.out.println("Error: min_chunk, avg_chunk and max_chunk must be powers of 2.");
                 } else {
                     //file not exist, error;
                     File fileToUpload = new File(args[4]);
@@ -74,12 +74,5 @@ class MyDedup {
         else{
             System.out.println("Invalid command");
         }
-
-        //debug statement
-        System.out.println("Number of arguments: " + args.length);
-        for (int i = 0; i < args.length; i++) {
-            System.out.println("Argument " + (i + 1) + ": " + args[i]);
-        }
-
     }
 }
