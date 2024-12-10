@@ -48,7 +48,7 @@ class MyDedup {
                         RFP rfp = new RFP();
                         int[] fingerprints = rfp.generateFingerprints(minChunkSize, avgChunkSize, fileToUpload);
                         Anchoring anchoring = new Anchoring();
-                        int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize);
+                        int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize, maxChunkSize);
                     }
                 }
             } catch (NumberFormatException e) {

@@ -38,6 +38,7 @@ public class RFP {
 
             return fingerprint;
         }
+        //will not trigger
         else{
             return new int[0];
         }
