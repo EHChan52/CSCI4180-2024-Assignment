@@ -7,7 +7,8 @@ public class Container {
     public ArrayList<Chunk> chunkContents = new ArrayList<>();
     public boolean safeToDelete = false;
 
-    public Container(long containerSize) {
+    public Container(long containerSize, long containerID) {
+        this.containerID = containerID;
         this.maxSize = containerSize;
     }
 

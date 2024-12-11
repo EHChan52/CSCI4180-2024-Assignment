@@ -71,10 +71,19 @@ class MyDedup {
                         }*/
                         WrapToContainer containers = new WrapToContainer();
                         ArrayList<Container> containerList = containers.createContainers(chunksList);
+                        /*
                         for (Container container : containerList) {
                             System.out.println(container);
+                        }*/
+
+                        try (java.io.FileWriter writer = new java.io.FileWriter("containerList")) {
+                            for (Container container : containerList) {
+                                writer.write(container.toString() + System.lineSeparator());
+                            }
+                            System.out.println("containerList.txt file created with container contents.");
+                        } catch (IOException e) {
+                            System.out.println("An error occurred while writing to containerList.txt file.");
                         }
-                        
                     }
                 }
             } catch (NumberFormatException e) {
