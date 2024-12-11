@@ -47,8 +47,16 @@ class MyDedup {
                         System.out.println("File " + args[4] + " exists. Proceeding with upload.");
                         RFP rfp = new RFP();
                         int[] fingerprints = rfp.generateFingerprints(minChunkSize, avgChunkSize, fileToUpload);
+                        //print out the contents of fingerprints
+
                         Anchoring anchoring = new Anchoring();
                         int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize, maxChunkSize);
+                        //print out the contents of anchors
+                        for (int anchor : anchors) {
+                            System.out.println(anchor);
+                        }
+
+
                     }
                 }
             } catch (NumberFormatException e) {
