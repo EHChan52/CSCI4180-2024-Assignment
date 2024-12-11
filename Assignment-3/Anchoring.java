@@ -34,14 +34,15 @@ public class Anchoring {
             }
         }
 
+        /* debug
         System.out.println("Anchor count: " + anchorCount);
         System.out.println("Anchors: ");
         for (int i = 0; i < anchorCount; i++) {
             System.out.print(anchor[i] + " ");
         }
         System.out.println();
+        */
 
-
-        return new int[0];
+        return anchor;
     }
 }
