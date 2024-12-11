@@ -4,10 +4,10 @@ import java.security.NoSuchAlgorithmException;
 
 public class Chunking {
     public Chunk[] generateChunks(byte[] data, int[] anchors, int chunkCount) throws IOException, NoSuchAlgorithmException {
-        Chunk[] chunkList = new Chunk[chunkCount + 1];
+        Chunk[] chunkList = new Chunk[chunkCount];
         int chunkCounter = 0;
         System.out.println("chunkCount: " + chunkCount);
-        for (int i = 0; i <= chunkCount; i++) {
+        for (int i = 0; i < chunkCount; i++) {
             chunkList[i] = new Chunk();
         }
 
@@ -19,13 +19,18 @@ public class Chunking {
                 byte[] checksumBytes = md.digest();
                 chunkList[chunkCounter].setChecksum(checksumBytes);
                 chunkCounter++;
+                if (chunkCounter < chunkCount) {
+                    chunkList[chunkCounter] = new Chunk();
+                }
             } else {
-                chunkList[chunkCounter].setData(data[i]);
+                if (chunkCounter < chunkCount) {
+                    chunkList[chunkCounter].setData(data[i]);
+                }
             }
         }
 
         // Finalize the last chunk
-        if (chunkCounter < chunkList.length) {
+        if (chunkCounter < chunkCount) {
             MessageDigest md = MessageDigest.getInstance("MD5");
             int len = data.length - (chunkCounter == 0 ? 0 : anchors[chunkCounter - 1] + 1);
             md.update(data, chunkCounter == 0 ? 0 : anchors[chunkCounter - 1] + 1, len);
@@ -36,3 +41,4 @@ public class Chunking {
         return chunkList;
     }
 }
+
