@@ -3,7 +3,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 public class Chunk {
-    public long chunkAddress = 0x00;
+    public long chunkAddress = 0x00000000;
     public byte[] checksum;
     public long size = 0;
     public byte[] datas = new byte[0];
@@ -23,7 +23,7 @@ public class Chunk {
         return datas;
     }
 
-    public void setData(byte data) throws IOException{
+    public void setData(byte data) throws IOException {
         baos.write(data);
         this.datas = baos.toByteArray();
         this.size += 1;
@@ -41,7 +41,7 @@ public class Chunk {
         return size;
     }
 
-    public long getReferenceCount(){
+    public long getReferenceCount() {
         return referenceCount;
     }
 

@@ -27,6 +27,18 @@ class MyDedup {
             System.out.println("mydedup.index file already exists.");
         }
 
+        // Create data folder if it does not exist
+        File dataFolder = new File("data");
+        if (!dataFolder.exists()) {
+            if (dataFolder.mkdir()) {
+                System.out.println("data folder created.");
+            } else {
+                System.out.println("Failed to create data folder.");
+            }
+        } else {
+            System.out.println("data folder already exists.");
+        }
+
         if("upload".equals(args[0]) && args.length == 5){
             try {
                 int minChunkSize = Integer.parseInt(args[1]); //windowsize
@@ -64,7 +76,7 @@ class MyDedup {
                             System.out.println(anchor);
                         }*/
                         Chunking chunker = new Chunking();
-                        Chunk[] chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
+                        ArrayList<Chunk> chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
                         /* 
                         for (Chunk chunk : chunksList) {
                             System.out.println(chunk);
@@ -76,7 +88,9 @@ class MyDedup {
                             System.out.println(container);
                         }*/
 
-                        try (java.io.FileWriter writer = new java.io.FileWriter("containerList")) {
+
+
+                        try (java.io.FileWriter writer = new java.io.FileWriter("./temp/containerList.tmp")) {
                             for (Container container : containerList) {
                                 writer.write(container.toString() + System.lineSeparator());
                             }
@@ -84,6 +98,9 @@ class MyDedup {
                         } catch (IOException e) {
                             System.out.println("An error occurred while writing to containerList.txt file.");
                         }
+
+
+
                     }
                 }
             } catch (NumberFormatException e) {

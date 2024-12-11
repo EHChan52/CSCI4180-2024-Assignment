@@ -3,28 +3,32 @@ import java.util.ArrayList;
 public class WrapToContainer {
     private static final long CONTAINER_SIZE = 1024 * 1024;
     long id = 0;
-    public ArrayList<Container> createContainers(Chunk[] chunklist) {
+
+    public ArrayList<Container> createContainers(ArrayList<Chunk> chunksList) {
         ArrayList<Container> containerList = new ArrayList<>();
-        Container buffer = new Container(CONTAINER_SIZE,id);
-        for (Chunk chunk : chunklist) {
-            // If container current size + size of current chunk is smaller than CONTAINER_SIZE
+        Container buffer = new Container(CONTAINER_SIZE, id);
+        long currentAddress = 0;
+
+        for (Chunk chunk : chunksList) {
+            chunk.setChunkAddress(currentAddress);
+            currentAddress += chunk.getSize();
+
             if (buffer.size + chunk.size < buffer.maxSize) {
                 buffer.addToContainer(chunk);
                 buffer.setSize(buffer.getSize() + chunk.size);
             } else {
-                // Add the full buffer to the container list
                 containerList.add(buffer);
                 id++;
-                // Create a new buffer and add the current chunk to it
-                buffer = new Container(CONTAINER_SIZE,id);
+                buffer = new Container(CONTAINER_SIZE, id);
                 buffer.addToContainer(chunk);
                 buffer.setSize(chunk.size);
             }
         }
-        // Add the last buffer to the container list if it has any chunks
+
         if (!buffer.chunkContents.isEmpty()) {
             containerList.add(buffer);
         }
+
         return containerList;
     }
 }
