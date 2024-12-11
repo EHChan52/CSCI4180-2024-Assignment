@@ -19,13 +19,13 @@ public class Anchoring {
             System.out.println("RFP[" + i + "] = " + RFP[i]);
             
             if (chunkLength == maxChunkSize - windowSize + 1) {
-                anchor[anchorCount] = i;
+                anchor[anchorCount] = i + windowSize - 1;
                 anchorCount++;
                 chunkLength = 0;
                 i = i + windowSize - 1;
             }
             else if ((RFP[i] & mask) == 0) {
-                anchor[anchorCount] = i;
+                anchor[anchorCount] = i + windowSize - 1;
                 anchorCount++;
                 i = i + windowSize - 1;
             }
