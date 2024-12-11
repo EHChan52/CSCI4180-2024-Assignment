@@ -1,0 +1,26 @@
+# Ignore all .class files
+*.class
+
+# Ignore other common files and directories
+# Ignore Mac system files
+.DS_Store
+
+# Ignore Windows system files
+Thumbs.db
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+*.iml
+
+# Ignore build directories
+bin/
+build/
+out/
+
+# Ignore logs
+*.log
+
+# Ignore temporary files
+*.tmp
+*.swp
