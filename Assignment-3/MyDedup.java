@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 
 class MyDedup {
     private static boolean isPowerOfTwo(int n) {
@@ -7,7 +8,7 @@ class MyDedup {
     }
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
 
         // Create mydedup.data file if it does not exist
         File indexFile = new File("mydedup.index");
@@ -45,8 +46,13 @@ class MyDedup {
                     }
                     else {
                         System.out.println("File " + args[4] + " exists. Proceeding with upload.");
+                        byte[] fileContent = null;
+                        try {
+                            fileContent = java.nio.file.Files.readAllBytes(fileToUpload.toPath());
+                        } catch (IOException e) {}
+
                         RFP rfp = new RFP();
-                        int[] fingerprints = rfp.generateFingerprints(minChunkSize, avgChunkSize, fileToUpload);
+                        int[] fingerprints = rfp.generateFingerprints(minChunkSize, avgChunkSize, fileContent);
                         //print out the contents of fingerprints
 
                         Anchoring anchoring = new Anchoring();
@@ -55,8 +61,10 @@ class MyDedup {
                         for (int anchor : anchors) {
                             System.out.println(anchor);
                         }
-
-
+                        Chunking chunker = new Chunking();
+                        Chunk[] chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
+                        
+                        
                     }
                 }
             } catch (NumberFormatException e) {
