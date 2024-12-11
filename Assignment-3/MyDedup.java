@@ -63,7 +63,9 @@ class MyDedup {
                         }
                         Chunking chunker = new Chunking();
                         Chunk[] chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
-                        
+                        for (Chunk chunk : chunksList) {
+                            System.out.println(chunk);
+                        }
                         
                     }
                 }
@@ -98,3 +100,4 @@ class MyDedup {
         }
     }
 }
+
