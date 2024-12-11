@@ -8,6 +8,14 @@ class MyDedup {
         return (n > 0) && ((n & (n - 1)) == 0);
     }
 
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
 
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
 
@@ -87,6 +95,20 @@ class MyDedup {
                         for (Container container : containerList) {
                             System.out.println(container);
                         }*/
+
+                        ArrayList<String> checksums = new ArrayList<>();
+                        for (Chunk chunk : chunksList) {
+                            checksums.add(bytesToHex(chunk.getChecksum()));
+                        }
+
+                        try (java.io.FileWriter checksumWriter = new java.io.FileWriter("./temp/file_recipe.tmp")) {
+                            for (String checksum : checksums) {
+                                checksumWriter.write(checksum + System.lineSeparator());
+                            }
+                            System.out.println("checksums.tmp file created with checksums.");
+                        } catch (IOException e) {
+                            System.out.println("An error occurred while writing to checksums.tmp file.");
+                        }
 
 
 
