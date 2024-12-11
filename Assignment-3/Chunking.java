@@ -6,7 +6,6 @@ public class Chunking {
     public Chunk[] generateChunks(byte[] data, int[] anchors, int chunkCount) throws IOException, NoSuchAlgorithmException {
         Chunk[] chunkList = new Chunk[chunkCount];
         int chunkCounter = 0;
-        System.out.println("chunkCount: " + chunkCount);
         for (int i = 0; i < chunkCount; i++) {
             chunkList[i] = new Chunk();
         }

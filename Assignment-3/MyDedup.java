@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 
 class MyDedup {
     private static boolean isPowerOfTwo(int n) {
@@ -58,13 +59,20 @@ class MyDedup {
                         Anchoring anchoring = new Anchoring();
                         int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize, maxChunkSize);
                         //print out the contents of anchors
+                        /*
                         for (int anchor : anchors) {
                             System.out.println(anchor);
-                        }
+                        }*/
                         Chunking chunker = new Chunking();
                         Chunk[] chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
+                        /* 
                         for (Chunk chunk : chunksList) {
                             System.out.println(chunk);
+                        }*/
+                        WrapToContainer containers = new WrapToContainer();
+                        ArrayList<Container> containerList = containers.createContainers(chunksList);
+                        for (Container container : containerList) {
+                            System.out.println(container);
                         }
                         
                     }

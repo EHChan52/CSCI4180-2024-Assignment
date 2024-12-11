@@ -11,14 +11,12 @@ public class Anchoring {
         for (int i = 0; i < fingerprint.length; i++) {
             RFP[i] = 0;
         }
-        System.out.println(fingerprint.length - windowSize);
         //not checked
         for (int i = 0; i < fingerprint.length - windowSize; i++) {
             for (int j = 0; j < windowSize; j++) {
                 RFP[i] = RFP[i] + (fingerprint[i+j] * (int) Math.pow(10, windowSize - j - 1));
             }
             RFP[i] = RFP[i] % avgChunkSize;
-            System.out.println("RFP[" + i + "] = " + RFP[i]);
 
             if (i + windowSize >= fingerprint.length) {
                 break;

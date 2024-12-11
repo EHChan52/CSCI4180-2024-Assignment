@@ -5,9 +5,9 @@ import java.util.Arrays;
 public class Chunk {
     public long chunkAddress = 0x00;
     public byte[] checksum;
-    public int size = 0;
+    public long size = 0;
     public byte[] datas = new byte[0];
-    public int referenceCount = 0;
+    public long referenceCount = 0;
 
     private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -35,6 +35,14 @@ public class Chunk {
 
     public void setChecksum(byte[] checksum) {
         this.checksum = checksum;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public long getReferenceCount(){
+        return referenceCount;
     }
 
     public void incrementReferenceCount() {
