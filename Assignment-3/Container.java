@@ -1,49 +1,25 @@
-import java.nio.charset.StandardCharsets;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-
 public class Container {
-    public Integer containerID;
+    public long containerID;
     public long size;
     public long maxSize;
-    public ArrayList<Chunk> chunkContents = new ArrayList<Chunk>();
+    public ArrayList<Chunk> chunkContents = new ArrayList<>();
     public boolean safeToDelete = false;
-    public byte [] data;
 
-    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-    public Container() {}
-
-    public Container(Integer containerID) {
-        this.containerID = containerID;
-        this.data = new byte[1024 * 1024];
-    }
-
-    public Container(long containerSize, Integer containerID) {
+    public Container(long containerSize, long containerID) {
         this.containerID = containerID;
         this.maxSize = containerSize;
     }
 
-    public Integer getContainerID() {
+    public long getContainerID() {
         return containerID;
     }
 
-    public void setContainerID(Integer id) {
+    public void setContainerID(long id) {
         this.containerID = id;
-    }
-
-    public byte [] getData() {
-        return data;
-    }
-
-    public void setData(byte data) throws IOException {
-        baos.write(data);
-        this.data = baos.toByteArray();
-        this.size += 1;
     }
 
     public boolean getSafeToDelete() {
@@ -70,23 +46,15 @@ public class Container {
         chunkContents.remove(chunk1);
     }
 
-    public void setChunkContents(ArrayList<Chunk> chunkContents) {
-        this.chunkContents = chunkContents;
-    }
-
-    public ArrayList<Chunk> getChunkContents() {
-        return this.chunkContents;
-    }
-
     @Override
     public String toString() {
-        //All raw data in the container
-        StringBuilder chunkDataStr = new StringBuilder();
-        for (Chunk chunk : chunkContents) {
-            chunkDataStr.append(new String(chunk.getData(), StandardCharsets.UTF_8));
-        }
-    
-        return chunkDataStr.toString();
+        return "Container{" +
+                "containerID=" + containerID +
+                ", size=" + size +
+                ", maxSize=" + maxSize +
+                ", chunkContents=" + chunkContents +
+                ", safeToDelete=" + safeToDelete +
+                '}';
     }
 
     public void parseString(String entry) {
@@ -99,7 +67,7 @@ public class Container {
                 containerMap.put(keyValue[0], keyValue[1]);
             }
 
-            this.containerID = Integer.parseInt(containerMap.get("containerID"));
+            this.containerID = Long.parseLong(containerMap.get("containerID"));
             this.size = Long.parseLong(containerMap.get("size"));
             this.maxSize = Long.parseLong(containerMap.get("maxSize"));
             this.safeToDelete = Boolean.parseBoolean(containerMap.get("safeToDelete"));

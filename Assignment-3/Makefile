@@ -1,27 +1,33 @@
-# Variables
-# MIN_CHUNK = 1024
-# AVG_CHUNK = 2048
-# MAX_CHUNK = 4096
-# FILE_TO_UPLOAD = input.txt
-# FILE_TO_DOWNLOAD = output.txt
-# LOCAL_FILE_NAME = local_output.txt
-# FILE_TO_DELETE = delete.txt
+# Define the Java compiler and flags
+JAVAC = javac
+JAVA = java
+JFLAGS = 
 
-# Java files
-JAVA_FILES = MyDedup.java Chunking.java Chunk.java Container.java Indexing.java WrapToContainer.java RFP.java Anchoring.java FileRecipe.java
+# Define the source files and the compiled class files
+SRC = Anchoring.java Chunk.java Chunking.java Container.java FileRecipe.java Indexing.java MyDedup.java RFP.java WrapToContainer.java
+CLASS_FILES = $(SRC:.java=.class)
 
-# Targets
-upload:
-    javac $(JAVA_FILES)
-    java MyDedup upload $(MIN_CHUNK) $(AVG_CHUNK) $(MAX_CHUNK) $(FILE_TO_UPLOAD)
+# Default target: compile all classes
+all: $(CLASS_FILES)
 
-download:
-    javac $(JAVA_FILES)
-    java MyDedup download $(FILE_TO_DOWNLOAD) $(LOCAL_FILE_NAME)
+%.class: %.java
+	$(JAVAC) $(JFLAGS) $<
 
-delete:
-    javac $(JAVA_FILES)
-    java MyDedup delete $(FILE_TO_DELETE)
+# Upload target
+upload: $(CLASS_FILES)
+	$(JAVA) MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <file_to_upload>
 
+# Download target
+download: $(CLASS_FILES)
+	$(JAVA) MyDedup download <file_to_download> <local_file_name>
+
+# Delete target
+delete: $(CLASS_FILES)
+	$(JAVA) MyDedup delete <file_to_delete>
+
+# Clean target: remove compiled class files
 clean:
-    rm -f *.class
+	rm -f *.class
+
+# Phony targets
+.PHONY: all upload download delete clean
