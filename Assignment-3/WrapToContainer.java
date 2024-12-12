@@ -7,19 +7,26 @@ public class WrapToContainer {
     public ArrayList<Container> createContainers(ArrayList<Chunk> chunksList) {
         ArrayList<Container> containerList = new ArrayList<>();
         Container buffer = new Container(CONTAINER_SIZE, id);
-        long currentAddress = 0;
+        int currentOffset = 0;
 
         for (Chunk chunk : chunksList) {
-            chunk.setChunkAddress(currentAddress);
-            currentAddress += chunk.getSize();
-
             if (buffer.size + chunk.size < buffer.maxSize) {
+                chunk.setContainerID(id);
+                chunk.setOffset(currentOffset);
+                currentOffset += chunk.getSize();
+
                 buffer.addToContainer(chunk);
                 buffer.setSize(buffer.getSize() + chunk.size);
             } else {
                 containerList.add(buffer);
                 id++;
                 buffer = new Container(CONTAINER_SIZE, id);
+                currentOffset = 0;
+
+                chunk.setContainerID(id);
+                chunk.setOffset(currentOffset);
+                currentOffset += chunk.getSize();
+
                 buffer.addToContainer(chunk);
                 buffer.setSize(chunk.size);
             }

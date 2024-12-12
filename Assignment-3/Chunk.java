@@ -5,7 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Chunk {
-    public long chunkAddress = 0x00000000;
+    // public long chunkAddress = 0x00000000;
+    public long containerID;
+    public int offset = 0;
     public byte[] checksum;
     public long size = 0;
     public byte[] datas = new byte[0];
@@ -13,12 +15,28 @@ public class Chunk {
 
     private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-    public long getChunkAddress() {
-        return chunkAddress;
+    // public long getChunkAddress() {
+    //     return chunkAddress;
+    // }
+
+    // public void setChunkAddress(long address) {
+    //     this.chunkAddress = address;
+    // }
+
+    public long getContainerID() {
+        return containerID;
     }
 
-    public void setChunkAddress(long address) {
-        this.chunkAddress = address;
+    public void setContainerID(long id) {
+        this.containerID = id;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
+    public void setOffset(int offset) {
+        this.offset = offset;
     }
 
     public byte[] getData() {
@@ -60,7 +78,8 @@ public class Chunk {
     @Override
     public String toString() {
         return "Chunk{" +
-                "chunkAddress=" + chunkAddress +
+                "containerID=" + containerID +
+                ", offset=" + offset +
                 ", checksum=" + Arrays.toString(checksum) +
                 ", size=" + size +
                 ", referenceCount=" + referenceCount +
@@ -77,7 +96,9 @@ public class Chunk {
                 chunkMap.put(keyValue[0], keyValue[1]);
             }
 
-            this.chunkAddress = Long.parseLong(chunkMap.get("chunkAddress"));
+            // this.chunkAddress = Long.parseLong(chunkMap.get("chunkAddress"));
+            this.containerID = Long.parseLong(chunkMap.get("containerID"));
+            this.offset = Integer.parseInt(chunkMap.get("offset"));
             this.size = Long.parseLong(chunkMap.get("size"));
             this.referenceCount = Integer.parseInt(chunkMap.get("referenceCount"));
             

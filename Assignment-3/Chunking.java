@@ -7,7 +7,7 @@ public class Chunking {
     public ArrayList<Chunk> generateChunks(byte[] data, int[] anchors, int chunkCount) throws IOException, NoSuchAlgorithmException {
         ArrayList<Chunk> chunkList = new ArrayList<>();
         int chunkCounter = 0;
-        long currentAddress = 0;
+        int currentOffset = 0;
 
         // Initialize the first chunk
         chunkList.add(new Chunk());
@@ -19,8 +19,8 @@ public class Chunking {
                 md.update(data, chunkCounter == 0 ? 0 : anchors[chunkCounter - 1] + 1, len);
                 byte[] checksumBytes = md.digest();
                 chunkList.get(chunkCounter).setChecksum(checksumBytes);
-                chunkList.get(chunkCounter).setChunkAddress(currentAddress);
-                currentAddress += chunkList.get(chunkCounter).getSize();
+                chunkList.get(chunkCounter).setOffset(currentOffset);
+                currentOffset += chunkList.get(chunkCounter).getSize();
                 chunkCounter++;
                 if (chunkCounter < chunkCount) {
                     chunkList.add(new Chunk());
@@ -39,7 +39,7 @@ public class Chunking {
             md.update(data, chunkCounter == 0 ? 0 : anchors[chunkCounter - 1] + 1, len);
             byte[] checksumBytes = md.digest();
             chunkList.get(chunkCounter).setChecksum(checksumBytes);
-            chunkList.get(chunkCounter).setChunkAddress(currentAddress);
+            chunkList.get(chunkCounter).setOffset(currentOffset);
         }
 
         return chunkList;
