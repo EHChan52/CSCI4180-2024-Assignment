@@ -1,3 +1,4 @@
+import java.awt.Container;
 import java.io.*;
 import java.util.*;
 
@@ -56,6 +57,52 @@ public class Indexing {
         saveIndex();
         saveFileRecipe(filename, recipe);
     }
+
+    //download file
+    public void downloadFile(String filename) {
+        List<String> recipe = fileRecipes.get(filename);
+        if (recipe == null) {
+            throw new IllegalArgumentException("File not found: " + filename);
+        }
+
+        // Create a new file and write the chunks to it
+        try (FileOutputStream fos = new FileOutputStream(DATA_DIR + File.separator + filename)) {
+            for (String checksum : recipe) {
+                Chunk chunk = chunkMap.get(checksum);
+                Container container = findContainerForChunk(chunk);
+                if (container != null) {
+                    byte[] data = readChunkFromContainer(container, chunk);
+                    fos.write(data);
+                } else {
+                    throw new IOException("Container not found for chunk: " + checksum);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error downloading file: " + e.getMessage());
+        }
+    }
+
+    private Container findContainerForChunk(Chunk chunk) {
+        for (List<Container> containers : containerMap.values()) {
+            for (Container container : containers) {
+                if (container.contains(chunk)) {
+                    return container;
+                }
+            }
+        }
+        return null;
+    }
+
+    private byte[] readChunkFromContainer(Container container, Chunk chunk) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(DATA_DIR + File.separator + container.getContainerID(), "r")) {
+            raf.seek(chunk.getAddress());
+            byte[] data = new byte[chunk.getSize()];
+            raf.readFully(data);
+            return data;
+        }
+    }
+
+    // end of download file
 
     public void deleteFile(String filename) {
         List<String> recipe = fileRecipes.get(filename);
