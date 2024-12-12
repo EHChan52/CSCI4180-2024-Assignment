@@ -52,7 +52,7 @@ public class Indexing {
         }
     }
 
-    public static  void saveIndex(File indexFile, ArrayList<Chunk> chunks) {
+    public static void saveIndex(File indexFile, ArrayList<Chunk> chunks) {
         try (PrintWriter writer = new PrintWriter(new FileWriter(indexFile))) {
             for (Chunk chunk : chunks) {
                 writer.println(chunk.toString());
@@ -62,35 +62,36 @@ public class Indexing {
         }
     }
 
-    public void processNewFile(String filename, ArrayList<Chunk> chunks, ArrayList<Container> containers) {
-        // Store file recipe
-        List<String> recipe = new ArrayList<>();
-        for (Chunk chunk : chunks) {
-            String checksum = bytesToHex(chunk.getChecksum());
-            recipe.add(checksum);
+    public static void loadContainer(File containerFile, ArrayList<Container> containers) {
+        if (containerFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(containerFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    try {
+                        Container container = new Container();
+                        container.parseString(line);
             
-            if (!chunkMap.containsKey(checksum)) {
-                // New unique chunk
-                chunkMap.put(checksum, chunk);
-                chunkReferences.put(checksum, 1);
-            } else {
-                // Existing chunk
-                chunkReferences.merge(checksum, 1, Integer::sum);
+                        containers.add(container);
+                    } catch (Exception e) {
+                        System.err.println("Error parsing container entry: " + e.getMessage());
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error loading container: " + e.getMessage());
             }
         }
-        fileRecipes.put(filename, recipe);
-
-        // Store containers
-        for (Container container : containers) {
-            String containerId = String.valueOf(container.getContainerID());
-            containerMap.computeIfAbsent(containerId, k -> new ArrayList<>()).add(container);
-            nextContainerID = Math.max(nextContainerID, container.getContainerID() + 1);
-        }
-
-        // Save the updated index
-        saveIndex();
-        saveFileRecipe(filename, recipe);
     }
+
+    public static void saveContainer(File containerFile, ArrayList<Container> containers) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(containerFile))) {
+            for (Container container : containers) {
+                writer.println(container.toString());
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving container: " + e.getMessage());
+        }
+    }
+
 
     //download file
     public void downloadFile(String filename) {

@@ -1,4 +1,5 @@
 import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,26 +57,16 @@ public class Container {
     public ArrayList<Chunk> getChunkContents() {
         return this.chunkContents;
     }
-    
+
     @Override
     public String toString() {
-        StringBuilder chunkContentsStr = new StringBuilder();
-        chunkContentsStr.append("ContainerID=").append(containerID)
-                        .append(", Size=").append(size)
-                        .append(", MaxSize=").append(maxSize)
-                        .append(System.lineSeparator());
-    
+        //All raw data in the container
+        StringBuilder chunkDataStr = new StringBuilder();
         for (Chunk chunk : chunkContents) {
-            chunkContentsStr.append("Chunk{")
-                            .append("Checksum=").append(Arrays.toString(chunk.getChecksum()))
-                            .append(", Size=").append(chunk.getSize())
-                            .append(", Offset=").append(chunk.getOffset())
-                            .append(", Data=").append(Arrays.toString(chunk.getData()))
-                            .append("}")
-                            .append(System.lineSeparator());
+            chunkDataStr.append(new String(chunk.getData(), StandardCharsets.UTF_8));
         }
     
-        return chunkContentsStr.toString();
+        return chunkDataStr.toString();
     }
 
     public void parseString(String entry) {
