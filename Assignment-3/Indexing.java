@@ -18,6 +18,7 @@ public class Indexing {
     //     containerMap = new HashMap<>();
     //     fileRecipes = new HashMap<>();
     //     chunkReferences = new HashMap<>();
+    //     containersMarkedForDeletion = new HashSet<>();
     //     nextContainerID = 0;
     //     initializeDirectories();
     //     loadIndex();
@@ -96,10 +97,13 @@ public class Indexing {
         // Create a new file and write the chunks to it
         try (FileOutputStream fos = new FileOutputStream(DATA_DIR + File.separator + filename)) {
             for (String checksum : recipe) {
-                Chunk chunk = chunkMap.get(checksum);
-                Container container = findContainerForChunk(chunk);
+                Chunk storedChunk= chunkMap.get(checksum);
+                if (storedChunk == null) {
+                    throw new IllegalArgumentException("Chunk not found: " + checksum);
+                }
+                Container container = findContainerForChunk(storedChunk);
                 if (container != null) {
-                    byte[] data = readChunkFromContainer(container, chunk);
+                    byte[] data = readChunkFromContainer(container, storedChunk);
                     fos.write(data);
                 } else {
                     throw new IOException("Container not found for chunk: " + checksum);
@@ -124,7 +128,7 @@ public class Indexing {
     private byte[] readChunkFromContainer(Container container, Chunk chunk) throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(DATA_DIR + File.separator + container.getContainerID(), "r")) {
             raf.seek(chunk.getAddress());
-            byte[] data = new byte[chunk.getSize()];
+            byte[] data = new byte[(int) chunk.getSize()];
             raf.readFully(data);
             return data;
         }
@@ -153,7 +157,7 @@ public class Indexing {
         new File(RECIPE_DIR + File.separator + filename + ".recipe").delete();
         
         // Save updated index
-        saveIndex();
+        saveIndex(new File(INDEX_FILE), new ArrayList<>(chunkMap.values()));
     }
 
     //testing
@@ -186,7 +190,7 @@ public class Indexing {
         // Find and mark containers that might be eligible for deletion
         for (List<Container> containers : containerMap.values()) {
             for (Container container : containers) {
-                Array<Chunk> currentChunkContents = container.getChunkContents();
+                ArrayList<Chunk> currentChunkContents = container.getChunkContents();
                 if (currentChunkContents.contains(chunk)) {
                     boolean allChunksUnreferenced = currentChunkContents.stream()
                         .allMatch(c -> chunkReferences.getOrDefault(bytesToHex(c.getChecksum()), 0) == 0);
