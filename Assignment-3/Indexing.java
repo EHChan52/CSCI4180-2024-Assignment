@@ -140,35 +140,39 @@ public class Indexing {
         }
     }
 
-    private void loadIndex() {
-        File indexFile = new File(INDEX_FILE);
+    public static ArrayList<Chunk> loadIndex(File indexFile) {
+        ArrayList<Chunk> chunkMetadata = new ArrayList<>();
         if (indexFile.exists()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(indexFile))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    parseIndexLine(line);
+                    try {
+                        Chunk chunk = new Chunk();
+                        chunk.parseString(line);
+            
+                        chunkMetadata.add(chunk);
+                    } catch (Exception e) {
+                        System.err.println("Error parsing chunk entry: " + e.getMessage());
+                    }
                 }
             } catch (IOException e) {
                 System.err.println("Error loading index: " + e.getMessage());
             }
+            return chunkMetadata;
+        } else {
+            return null;
         }
     }
 
     private void saveIndex() {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(INDEX_FILE))) {
-            // Write chunk information
-            for (Map.Entry<String, Chunk> entry : chunkMap.entrySet()) {
-                writer.println(serializeChunkEntry(entry.getValue()));
-            }
-            // Write container information
-            for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
-                for (Container container : entry.getValue()) {
-                    writer.println(serializeContainer(container));
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error saving index: " + e.getMessage());
-        }
+        // try (PrintWriter writer = new PrintWriter(new FileWriter(INDEX_FILE))) {
+        //     // Write chunk information
+        //     for (Map.Entry<String, Chunk> entry : chunkMap.entrySet()) {
+        //         writer.println(serializeChunkEntry(entry.getValue()));
+        //     }
+        // } catch (IOException e) {
+        //     System.err.println("Error saving index: " + e.getMessage());
+        // }
     }
 
     private void saveFileRecipe(String filename, List<String> recipe) {
@@ -211,29 +215,6 @@ public class Indexing {
             .mapToLong(Chunk::getSize)
             .sum();
         return totalPreDedupBytes > 0 ? (double) totalPreDedupBytes / uniqueBytes : 1.0;
-    }
-
-    private void parseIndexLine(String line) {
-        String[] parts = line.split("\\{");
-        if (parts[0].equals("Chunk")) {
-            parseChunkEntry(line);
-        } else if (parts[0].equals("Container")) {
-            parseContainerEntry(line);
-        }
-    }
-
-    private void parseChunkEntry(String entry) {
-        // Format: Chunk{chunkAddress=address, checksum=[checksum], size=size, referenceCount=referenceCount}
-        try {
-            Chunk chunk = new Chunk();
-            chunk.parseString(entry);
-
-            String checksum = Arrays.toString(chunk.getChecksum());
-            chunkMap.put(checksum, chunk);
-            chunkReferences.put(checksum, 0); // Will be updated when processing recipes
-        } catch (Exception e) {
-            System.err.println("Error parsing chunk entry: " + e.getMessage());
-        }
     }
 
     private void parseContainerEntry(String entry) {

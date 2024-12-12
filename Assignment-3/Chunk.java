@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Chunk {
+    //This part is for metadata in mydedup.index
+    
     // public long chunkAddress = 0x00000000;
     public long containerID;
     public int offset = 0;
