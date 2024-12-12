@@ -8,6 +8,7 @@ public class Indexing {
     private Map<String, List<String>> fileRecipes; // Maps filename to list of chunk checksums
     private Map<String, Integer> chunkReferences; // Maps checksum to reference count
     private long nextContainerID;
+    private Set<String> containersMarkedForDeletion;
     
     private static final String INDEX_FILE = "mydedup.index";
     private static final String RECIPE_DIR = "recipes";
@@ -18,6 +19,7 @@ public class Indexing {
         containerMap = new HashMap<>();
         fileRecipes = new HashMap<>();
         chunkReferences = new HashMap<>();
+        containersMarkedForDeletion = new HashSet<>();
         nextContainerID = 0;
         initializeDirectories();
         loadIndex();
@@ -130,25 +132,26 @@ public class Indexing {
 
     //testing
     private void deleteEmptyContainers() {
-        List<String> containersToDelete = new ArrayList<>();
-        for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
-            List<Container> containers = entry.getValue();
-            containers.removeIf(container -> {
-                if (container.getSafeToDelete()) {
-                    containersToDelete.add(String.valueOf(container.getContainerID()));
-                    return true;
-                }
-                return false;
-            });
-        }
-
+        List<String> containersToDelete = new ArrayList<>(containersMarkedForDeletion);
+        // for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
+        //     List<Container> containers = entry.getValue();
+        //     containers.removeIf(container -> {
+        //         if (container.getSafeToDelete()) {
+        //             containersToDelete.add(String.valueOf(container.getContainerID()));
+        //             return true;
+        //         }
+        //         return false;
+        //     });
+        // }
         // Physically remove the containers from the storage backend
         for (String containerId : containersToDelete) {
             File containerFile = new File(DATA_DIR + File.separator + containerId);
             if (containerFile.exists()) {
                 containerFile.delete();
             }
+            containerMap.remove(containerId);
         }
+        containersMarkedForDeletion.clear();
     }
 
     //end of testing
@@ -163,6 +166,9 @@ public class Indexing {
                         .allMatch(c -> chunkReferences.getOrDefault(bytesToHex(c.getChecksum()), 0) == 0);
                     // .allMatch(c -> !chunkMap.containsKey(bytesToHex(c.getChecksum())));
                     container.setSafeToDelete(allChunksUnreferenced);
+                    if(allChunksUnreferenced) {
+                        containersMarkedForDeletion.add(String.valueOf(container.getContainerID()));
+                    }
                 }
             }
         }
