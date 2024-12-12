@@ -1,14 +1,14 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class Indexing {
-    private Map<String, Chunk> chunkMap; // Maps checksum to chunk
-    private Map<String, List<Container>> containerMap; // Maps container ID to container
-    private Map<String, List<String>> fileRecipes; // Maps filename to list of chunk checksums
-    private Map<String, Integer> chunkReferences; // Maps checksum to reference count
-    private long nextContainerID;
-    private Set<String> containersMarkedForDeletion;
-    
+    // private Map<String, Chunk> chunkMap; // Maps checksum to chunk
+    // private Map<String, List<Container>> containerMap; // Maps container ID to container
+    // private Map<String, FileRecipe> fileRecipes; // Maps filename to list of chunk checksums
+    // private Map<String, Integer> chunkReferences; // Maps checksum to reference count
+    // private long nextContainerID;
+    private static Set<Chunk> containersMarkedForDeletion;
     private static final String INDEX_FILE = "mydedup.index";
     private static final String RECIPE_DIR = "recipes";
     private static final String DATA_DIR = "data";
@@ -140,25 +140,35 @@ public class Indexing {
     }
 
     //download file
-    public void downloadFile(String filename) {
-        List<String> recipe = fileRecipes.get(filename);
+    public static void downloadFile(String filename, String localFileName, ArrayList<Chunk> chunkMetadata) {
+        
+        FileRecipe recipe = .get(filename);
         if (recipe == null) {
             throw new IllegalArgumentException("File not found: " + filename);
         }
 
         // Create a new file and write the chunks to it
         try (FileOutputStream fos = new FileOutputStream(DATA_DIR + File.separator + filename)) {
-            for (String checksum : recipe) {
-                Chunk storedChunk= chunkMap.get(checksum);
-                if (storedChunk == null) {
-                    throw new IllegalArgumentException("Chunk not found: " + checksum);
-                }
-                Container container = findContainerForChunk(storedChunk);
-                if (container != null) {
-                    byte[] data = readChunkFromContainer(container, storedChunk);
+            // for (String checksum : recipe) {
+            //     Chunk storedChunk= chunkMap.get(checksum);
+            //     if (storedChunk == null) {
+            //         throw new IllegalArgumentException("Chunk not found: " + checksum);
+            //     }
+            //     Container container = findContainerForChunk(storedChunk);
+            //     if (container != null) {
+            //         byte[] data = readChunkFromContainer(container, storedChunk);
+            //         fos.write(data);
+            //     } else {
+            //         throw new IOException("Container not found for chunk: " + checksum);
+            //     }
+            // }
+            for (Chunk chunk : recipe.getChunkList()) {
+                if (chunk != null) {
+                    long currentContainerID = chunk.getContainerID();
+                    byte[] data = readChunkFromContainer(currentContainerID, chunk);
                     fos.write(data);
                 } else {
-                    throw new IOException("Container not found for chunk: " + checksum);
+                    throw new IOException("Container not found for chunk: " + chunk);
                 }
             }
         } catch (IOException e) {
@@ -166,19 +176,10 @@ public class Indexing {
         }
     }
 
-    private Container findContainerForChunk(Chunk chunk) {
-        for (List<Container> containers : containerMap.values()) {
-            for (Container container : containers) {
-                if (container.contains(chunk)) {
-                    return container;
-                }
-            }
-        }
-        return null;
-    }
-
-    private byte[] readChunkFromContainer(Container container, Chunk chunk) throws IOException {
+    private byte[] readChunkFromContainer(long containerID, Chunk chunk) throws IOException {
+        Container container = 
         try (RandomAccessFile raf = new RandomAccessFile(DATA_DIR + File.separator + container.getContainerID(), "r")) {
+           for  
             raf.seek(chunk.getAddress());
             byte[] data = new byte[(int) chunk.getSize()];
             raf.readFully(data);
@@ -189,70 +190,142 @@ public class Indexing {
     // end of download file
 
     //delete file
-    public void deleteFile(String filename) {
-        List<String> recipe = fileRecipes.get(filename);
+    public static void deleteFile(String filename, ArrayList<Chunk> chunkMetadata) {
+        FileRecipe recipe = loadRecipe(new File(filename));
         if (recipe == null) {
             throw new IllegalArgumentException("File not found: " + filename);
         }
 
-        // Decrement reference counts and identify chunks to delete
-        for (String checksum : recipe) {
-            int newRefCount = chunkReferences.merge(checksum, -1, Integer::sum);
-            if (newRefCount == 0) {
-                Chunk chunk = chunkMap.remove(checksum);
-                markContainerForDeletion(chunk);
+        ArrayList<Chunk> chunkList = recipe.getChunkList();
+
+        for (Chunk chunk : chunkList) {
+            chunk.decrementReferenceCount();
+            if (chunk.getReferenceCount() == 0) {
+                removeChunkFromIndex(chunk);
             }
         }
-
         // Remove file recipe
-        fileRecipes.remove(filename);
+        // chunkMetadata.removeIf(chunk -> chunkList.contains(chunk));
         new File(RECIPE_DIR + File.separator + filename + ".recipe").delete();
+
+        boolean hasValidChunks = chunkList.stream().anyMatch(chunk -> chunk.getReferenceCount() > 0);
+        if (!hasValidChunks) {
+            long containerID = chunkList.get(0).getContainerID();
+            // Delete the container file from the storage
+            File containerFile = new File(DATA_DIR + File.separator + containerID);
+            if (containerFile.exists() && containerFile.delete()) {
+                System.out.println("Container file deleted: " + containerID);
+            } else {
+                System.err.println("Failed to delete container file: " + containerID);
+            }
+            // Update the index file to remove the container entry
+            removeContainerFromIndex(containerID);
+        }
+
+        
+        
         
         // Save updated index
-        saveIndex(new File(INDEX_FILE), new ArrayList<>(chunkMap.values()));
+        saveIndex(new File(INDEX_FILE), chunkMetadata);
     }
 
     //testing
-    private void deleteEmptyContainers() {
-        List<String> containersToDelete = new ArrayList<>(containersMarkedForDeletion);
-        // for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
-        //     List<Container> containers = entry.getValue();
-        //     containers.removeIf(container -> {
-        //         if (container.getSafeToDelete()) {
-        //             containersToDelete.add(String.valueOf(container.getContainerID()));
-        //             return true;
-        //         }
-        //         return false;
-        //     });
-        // }
-        // Physically remove the containers from the storage backend
-        for (String containerId : containersToDelete) {
-            File containerFile = new File(DATA_DIR + File.separator + containerId);
-            if (containerFile.exists()) {
-                containerFile.delete();
+    private static void removeChunkFromIndex(Chunk chunk) {
+        File indexFile = new File(INDEX_FILE);
+        File tempFile = new File(INDEX_FILE + ".tmp");
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+             PrintWriter writer = new PrintWriter(new FileWriter(tempFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.contains(chunk.toString())) {
+                    writer.println(line);
+                }
             }
-            containerMap.remove(containerId);
+        } catch (IOException e) {
+            System.err.println("Error updating index: " + e.getMessage());
         }
-        containersMarkedForDeletion.clear();
+
+        if (!indexFile.delete()) {
+            System.err.println("Could not delete original index file");
+        }
+        if (!tempFile.renameTo(indexFile)) {
+            System.err.println("Could not rename temporary index file");
+        }
+    }
+
+    private static void removeContainerFromIndex(long containerID) {
+        File indexFile = new File(INDEX_FILE);
+        File tempFile = new File(INDEX_FILE + ".tmp");
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(indexFile));
+             PrintWriter writer = new PrintWriter(new FileWriter(tempFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.contains("container-" + containerID)) {
+                    writer.println(line);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error updating index: " + e.getMessage());
+        }
+
+        if (!indexFile.delete()) {
+            System.err.println("Could not delete original index file");
+        }
+        if (!tempFile.renameTo(indexFile)) {
+            System.err.println("Could not rename temporary index file");
+        }
     }
 
     //end of testing
 
-    private void markContainerForDeletion(Chunk chunk) {
-        // Find and mark containers that might be eligible for deletion
-        for (List<Container> containers : containerMap.values()) {
-            for (Container container : containers) {
-                ArrayList<Chunk> currentChunkContents = container.getChunkContents();
-                if (currentChunkContents.contains(chunk)) {
-                    boolean allChunksUnreferenced = currentChunkContents.stream()
-                        .allMatch(c -> chunkReferences.getOrDefault(bytesToHex(c.getChecksum()), 0) == 0);
-                    // .allMatch(c -> !chunkMap.containsKey(bytesToHex(c.getChecksum())));
-                    container.setSafeToDelete(allChunksUnreferenced);
-                    if(allChunksUnreferenced) {
-                        containersMarkedForDeletion.add(String.valueOf(container.getContainerID()));
-                    }
-                }
+    // private void markContainerForDeletion(Chunk chunk) {
+    //     // Find and mark containers that might be eligible for deletion
+    //     for (List<Container> containers : containerMap.values()) {
+    //         for (Container container : containers) {
+    //             ArrayList<Chunk> currentChunkContents = container.getChunkContents();
+    //             if (currentChunkContents.contains(chunk)) {
+    //                 boolean allChunksUnreferenced = currentChunkContents.stream()
+    //                     .allMatch(c -> chunkReferences.getOrDefault(bytesToHex(c.getChecksum()), 0) == 0);
+    //                 // .allMatch(c -> !chunkMap.containsKey(bytesToHex(c.getChecksum())));
+    //                 container.setSafeToDelete(allChunksUnreferenced);
+    //                 if(allChunksUnreferenced) {
+    //                     containersMarkedForDeletion.add(String.valueOf(container.getContainerID()));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    public static void deleteContainer(long containerID) {
+        // Check if the container exists in the containerMap
+        Container container = loadContainer(containerID);
+        if (container == null) {
+            System.err.println("Container not found: " + containerID);
+            return;
+        }
+
+        // Verify if the container has no valid chunks
+        ArrayList<Chunk> chunkList = container.getChunkContents();
+        boolean hasValidChunks = chunkList.stream().anyMatch(chunk -> chunk.getReferenceCount() > 0);
+
+        if (!hasValidChunks) {
+            // Delete the container file from the storage
+            File containerFile = new File(DATA_DIR + File.separator + containerID);
+            if (containerFile.exists() && containerFile.delete()) {
+                System.out.println("Container file deleted: " + containerID);
+            } else {
+                System.err.println("Failed to delete container file: " + containerID);
             }
+
+            // Remove the container entry from the containerMap
+            containerMap.remove(containerID);
+
+            // Update the index file to remove the container entry
+            updateIndexFile(containerID);
+        } else {
+            System.out.println("Container has valid chunks and cannot be deleted: " + containerID);
         }
     }
 

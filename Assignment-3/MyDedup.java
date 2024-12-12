@@ -186,6 +186,19 @@ class MyDedup {
         else if("download".equals(args[0]) && args.length == 3){
             System.out.println("download");
 
+            String fileToDownload = new String(args[1]);
+            String localFileName = new String(args[2]);
+            if (!fileToDownload.isEmpty()) {
+                System.out.println("Error: File " + args[4] + " is empty.");
+            } 
+            else {
+                System.out.println("File " + args[4] + " exists. Proceeding with upload.");
+                Indexing.downloadFile(fileToDownload, localFileName, chunkMetadata);
+                
+            }
+
+
+
         }
         
         else if("download".equals(args[0]) && (args.length != 3)){
@@ -194,6 +207,17 @@ class MyDedup {
         
         else if("delete".equals(args[0]) && (args.length == 2)){
             System.out.println("delete");
+            String fileToDelete = new String(args[1]);
+            if (!fileToDelete.isEmpty()) {
+                System.out.println("Error: File " + args[4] + " is empty.");
+            } 
+            else {
+                System.out.println("File " + args[4] + " exists. Proceeding with upload.");
+                Indexing.deleteFile(fileToDelete, chunkMetadata);
+                
+            }
+
+
         }
 
         else if("delete".equals(args[0]) && (args.length != 2)){
