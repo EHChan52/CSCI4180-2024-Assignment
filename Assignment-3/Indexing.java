@@ -105,7 +105,6 @@ public class Indexing {
     }
 
     public static FileRecipe loadRecipe(File recipeFile) {
-        FileRecipe recipe = new FileRecipe();
         ArrayList<Chunk> chunkList = new ArrayList<>();
         if (recipeFile.exists()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(recipeFile))) {
@@ -122,8 +121,7 @@ public class Indexing {
             } catch (IOException e) {
                 System.err.println("Error loading recipe: " + e.getMessage());
             }
-            recipe.setFileName(recipeFile.getName().replace("recipe-", ""));
-            recipe.setChunkList(chunkList);
+            FileRecipe recipe = new FileRecipe(recipeFile.getName().replace("recipe-", ""), chunkList);
             return recipe;
         }
         return null;

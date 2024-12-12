@@ -137,6 +137,8 @@ class MyDedup {
                             System.out.println(container);
                         }*/
 
+                        FileRecipe recipe = new FileRecipe(fileToUpload.getName(), chunksList);
+
                         ArrayList<String> checksums = new ArrayList<>();
                         for (Chunk chunk : chunksList) {
                             checksums.add(bytesToHex(chunk.getChecksum()));
@@ -167,10 +169,9 @@ class MyDedup {
                             File containerFile = new File("data/container-" + container.getContainerID() + ".bin");
                             Indexing.saveContainer(containerFile, container);
                         }
-                        for (FileRecipe recipe : recipeList) {
-                            File recipeFile = new File("data/recipe-" + recipe.getFileName() + ".bin");
-                            Indexing.saveRecipe(recipeFile, recipe);
-                        }
+
+                        File recipeFile = new File("data/recipe-" + fileToUpload.getName() + ".txt");
+                        Indexing.saveRecipe(recipeFile, recipe);
 
                     }
                 }
