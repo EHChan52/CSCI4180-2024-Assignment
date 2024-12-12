@@ -63,21 +63,45 @@ public class Indexing {
         }
     }
 
-    public static void loadContainer(File containerFile) {
-        if (containerFile.exists()) {
-            try (BufferedReader reader = new BufferedReader(new FileReader(containerFile))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    
-                }
-            } catch (IOException e) {
-                System.err.println("Error loading container: " + e.getMessage());
+    public static Container loadContainer(File containerFile) throws IOException {
+        try (DataInputStream dis = new DataInputStream(new FileInputStream(containerFile))) {
+            // Read container metadata
+            int containerID = dis.readInt();
+            long size = dis.readLong();
+            long maxSize = dis.readLong();
+
+            // Create container
+            Container container = new Container(containerID);
+            container.setSize(size);
+
+            // Read chunk data
+            while (dis.available() > 0) {
+                long chunkSize = dis.readLong(); // Read chunk size
+                byte[] chunkData = new byte[(int) chunkSize];
+                dis.readFully(chunkData); // Read raw chunk data
+
+                Chunk chunk = new Chunk();
+                chunk.setData(chunkData);
+                container.getChunkContents().add(chunk);
             }
+
+            return container;
         }
     }
 
-    public static void saveContainer(File[] containerFiles, ArrayList<Container> containers) {
-        
+    public static void saveContainer(File containerFile, Container container) throws IOException {
+        try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(containerFile))) {
+            // Write container metadata
+            dos.writeInt(container.getContainerID());
+            dos.writeLong(container.getSize());
+            dos.writeLong(container.maxSize);
+
+            // Write chunk data
+            for (Chunk chunk : container.getChunkContents()) {
+                dos.writeLong(chunk.getSize()); // Write chunk size
+                dos.write(chunk.getData());     // Write raw chunk data
+            }
+        }
     }
 
     public static FileRecipe loadRecipe(File recipeFile) {

@@ -1,6 +1,8 @@
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 
@@ -20,6 +22,8 @@ class MyDedup {
 
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
         ArrayList<Chunk> chunkMetadata = new ArrayList<>();
+        ArrayList<Container> containerList = new ArrayList<>();
+        ArrayList<FileRecipe> recipeList = new ArrayList<>();
         // Create mydedup.data file if it does not exist
         File indexFile = new File("mydedup.index");
         if (!indexFile.exists()) {
@@ -56,6 +60,7 @@ class MyDedup {
             if (containerFiles != null) {
                 for (File file : containerFiles) {
                     System.out.println("Found container file: " + file.getName());
+                    containerList.add(Indexing.loadContainer(file));
                 }
             } else {
                 System.out.println("No container files found.");
@@ -70,6 +75,7 @@ class MyDedup {
             if (recipeFiles != null) {
                 for (File file : recipeFiles) {
                     System.out.println("Found recipe file: " + file.getName());
+                    recipeList.add(Indexing.loadRecipe(file));
                 }
             } else {
                 System.out.println("No recipe files found.");
@@ -96,6 +102,12 @@ class MyDedup {
                     }
                     else {
                         System.out.println("File " + args[4] + " exists. Proceeding with upload.");
+                        //Check the path of the file is already exist or not
+                        if (Files.exists(Paths.get("./data/recipe-" + args[4]))) {
+                            System.out.println("Recipe file for " + args[4] + " already exists in /data folder. Exiting.");
+                            System.exit(1);
+                        }
+
                         byte[] fileContent = null;
                         try {
                             fileContent = java.nio.file.Files.readAllBytes(fileToUpload.toPath());
@@ -119,7 +131,7 @@ class MyDedup {
                             System.out.println(chunk);
                         }*/
                         WrapToContainer containers = new WrapToContainer();
-                        ArrayList<Container> containerList = containers.createContainers(chunksList);
+                        containerList = containers.createContainers(chunksList);
                         /*
                         for (Container container : containerList) {
                             System.out.println(container);
@@ -151,7 +163,14 @@ class MyDedup {
                         }
 
                         Indexing.saveIndex(indexFile, chunkMetadata);
-                        Indexing.saveContainer(indexFile, containerList);
+                        for (Container container : containerList) {
+                            File containerFile = new File("data/container-" + container.getContainerID() + ".bin");
+                            Indexing.saveContainer(containerFile, container);
+                        }
+                        for (FileRecipe recipe : recipeList) {
+                            File recipeFile = new File("data/recipe-" + recipe.getFileName() + ".bin");
+                            Indexing.saveRecipe(recipeFile, recipe);
+                        }
 
                     }
                 }

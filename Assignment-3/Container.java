@@ -1,29 +1,49 @@
-import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+
 public class Container {
-    public long containerID;
+    public Integer containerID;
     public long size;
     public long maxSize;
     public ArrayList<Chunk> chunkContents = new ArrayList<Chunk>();
     public boolean safeToDelete = false;
+    public byte [] data;
+
+    private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     public Container() {}
 
-    public Container(long containerSize, long containerID) {
+    public Container(Integer containerID) {
+        this.containerID = containerID;
+        this.data = new byte[1024 * 1024];
+    }
+
+    public Container(long containerSize, Integer containerID) {
         this.containerID = containerID;
         this.maxSize = containerSize;
     }
 
-    public long getContainerID() {
+    public Integer getContainerID() {
         return containerID;
     }
 
-    public void setContainerID(long id) {
+    public void setContainerID(Integer id) {
         this.containerID = id;
+    }
+
+    public byte [] getData() {
+        return data;
+    }
+
+    public void setData(byte data) throws IOException {
+        baos.write(data);
+        this.data = baos.toByteArray();
+        this.size += 1;
     }
 
     public boolean getSafeToDelete() {
@@ -79,7 +99,7 @@ public class Container {
                 containerMap.put(keyValue[0], keyValue[1]);
             }
 
-            this.containerID = Long.parseLong(containerMap.get("containerID"));
+            this.containerID = Integer.parseInt(containerMap.get("containerID"));
             this.size = Long.parseLong(containerMap.get("size"));
             this.maxSize = Long.parseLong(containerMap.get("maxSize"));
             this.safeToDelete = Boolean.parseBoolean(containerMap.get("safeToDelete"));

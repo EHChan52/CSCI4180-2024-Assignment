@@ -8,8 +8,8 @@ public class Chunk {
     //This part is for metadata in mydedup.index
 
     // public long chunkAddress = 0x00000000;
-    public long containerID;
-    public int offset = 0;
+    public Integer containerID;
+    public Integer offset = 0;
     public byte[] checksum;
     public long size = 0;
     public byte[] datas = new byte[0];
@@ -25,19 +25,19 @@ public class Chunk {
     //     this.chunkAddress = address;
     // }
 
-    public long getContainerID() {
+    public Integer getContainerID() {
         return containerID;
     }
 
-    public void setContainerID(long id) {
+    public void setContainerID(Integer id) {
         this.containerID = id;
     }
 
-    public int getOffset() {
+    public Integer getOffset() {
         return offset;
     }
 
-    public void setOffset(int offset) {
+    public void setOffset(Integer offset) {
         this.offset = offset;
     }
 
@@ -49,6 +49,12 @@ public class Chunk {
         baos.write(data);
         this.datas = baos.toByteArray();
         this.size += 1;
+    }
+
+    public void setData(byte[] data) throws IOException {
+        baos.write(data);
+        this.datas = baos.toByteArray();
+        this.size += data.length;
     }
 
     public byte[] getChecksum() {
@@ -100,7 +106,7 @@ public class Chunk {
                 }
 
                 // this.chunkAddress = Long.parseLong(chunkMap.get("chunkAddress"));
-                this.containerID = Long.parseLong(chunkMap.get("containerID"));
+                this.containerID = Integer.parseInt(chunkMap.get("containerID"));
                 this.offset = Integer.parseInt(chunkMap.get("offset"));
                 this.size = Long.parseLong(chunkMap.get("size"));
                 this.referenceCount = Integer.parseInt(chunkMap.get("referenceCount"));
