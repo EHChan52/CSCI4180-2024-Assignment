@@ -1,10 +1,14 @@
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.List;
 
 class MyDedup {
     private static boolean isPowerOfTwo(int n) {
@@ -194,8 +198,29 @@ class MyDedup {
             } 
             else {
                 System.out.println("File " + args[4] + " exists. Proceeding with upload.");
-                Indexing.downloadFile(fileToDownload, localFileName, chunkMetadata);
-                
+                // Indexing.downloadFile(fileToDownload, localFileName, chunkMetadata);
+                FileRecipe recipe = Indexing.loadRecipe(new File(fileToDownload));
+                List<Chunk> chunkList = recipe.getChunkList();
+                ByteArrayOutputStream data = new ByteArrayOutputStream();
+
+                for (Chunk chunk : chunkList) {
+                    FileInputStream finContainer = new FileInputStream("data/" + chunk.getContainerID(););
+                    finContainer.skip(chunk.getOffset());
+                    byte[] containerData = new byte[(int) chunk.getSize()];
+                    finContainer.read(containerData);
+                    data.write(containerData);
+                    finContainer.close();
+                }
+                 File fout = new File(args[2]);
+                if (fout.getParentFile() != null) {
+                    fout.getParentFile().mkdirs();
+                }
+                if (!fout.exists()) {
+                    fout.createNewFile();
+                }
+                FileOutputStream newFile = new FileOutputStream(fout);
+                data.writeTo(newFile);
+                newFile.close();        
             }
 
 
@@ -214,7 +239,7 @@ class MyDedup {
             } 
             else {
                 System.out.println("File " + args[4] + " exists. Proceeding with upload.");
-                Indexing.deleteFile(fileToDelete, chunkMetadata);
+                // Indexing.deleteFile(fileToDelete, chunkMetadata);
                 
             }
 
