@@ -67,14 +67,7 @@ public class Indexing {
             try (BufferedReader reader = new BufferedReader(new FileReader(containerFile))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    try {
-                        Container container = new Container();
-                        container.parseString(line);
-            
-                        containers.add(container);
-                    } catch (Exception e) {
-                        System.err.println("Error parsing container entry: " + e.getMessage());
-                    }
+                    
                 }
             } catch (IOException e) {
                 System.err.println("Error loading container: " + e.getMessage());
