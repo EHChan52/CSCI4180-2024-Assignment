@@ -1,6 +1,8 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Chunk {
     public long chunkAddress = 0x00000000;
@@ -63,5 +65,32 @@ public class Chunk {
                 ", size=" + size +
                 ", referenceCount=" + referenceCount +
                 '}';
+    }
+
+    public void parseString(String entry) {
+        // Format: Chunk{chunkAddress=address, checksum=[checksum], size=size, referenceCount=referenceCount}
+        try {
+            Map<String, String> chunkMap = new HashMap<>();
+            String[] parts = entry.replace("Chunk{", "").replace("}", "").split(", ");
+            for (String part : parts) {
+                String[] keyValue = part.split("=");
+                chunkMap.put(keyValue[0], keyValue[1]);
+            }
+
+            this.chunkAddress = Long.parseLong(chunkMap.get("chunkAddress"));
+            this.size = Long.parseLong(chunkMap.get("size"));
+            this.referenceCount = Integer.parseInt(chunkMap.get("referenceCount"));
+            
+            String checksumStr = chunkMap.get("checksum").replace("[", "").replace("]", "");
+            String[] byteValues = checksumStr.split(", ");
+            byte[] checksumValue = new byte[byteValues.length];
+            
+            for (int i = 0; i < byteValues.length; i++) {
+                checksumValue[i] = Byte.parseByte(byteValues[i]);
+            }
+            this.checksum = checksumValue;
+        } catch (Exception e) {
+            System.err.println("Error parsing chunk entry: " + e.getMessage());
+        }
     }
 }

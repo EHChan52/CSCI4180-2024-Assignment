@@ -1,7 +1,5 @@
 import java.io.*;
 import java.util.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 public class Indexing {
     private Map<String, Chunk> chunkMap; // Maps checksum to chunk
@@ -113,7 +111,7 @@ public class Indexing {
         try (PrintWriter writer = new PrintWriter(new FileWriter(INDEX_FILE))) {
             // Write chunk information
             for (Map.Entry<String, Chunk> entry : chunkMap.entrySet()) {
-                writer.println(serializeChunkEntry(entry.getKey(), entry.getValue()));
+                writer.println(serializeChunkEntry(entry.getValue()));
             }
             // Write container information
             for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
@@ -168,32 +166,22 @@ public class Indexing {
         return totalPreDedupBytes > 0 ? (double) totalPreDedupBytes / uniqueBytes : 1.0;
     }
 
-    private static final String DELIMITER = "||";
-
     private void parseIndexLine(String line) {
-        String[] parts = line.split("\\|\\|");
-        if (parts[0].equals("CHUNK")) {
-            parseChunkEntry(parts);
-        } else if (parts[0].equals("CONTAINER")) {
-            parseContainerEntry(parts);
+        String[] parts = line.split("\\{");
+        if (parts[0].equals("Chunk")) {
+            parseChunkEntry(line);
+        } else if (parts[0].equals("Container")) {
+            parseContainerEntry(line);
         }
     }
 
-    private void parseChunkEntry(String[] parts) {
-        // Format: CHUNK||checksum||size||address||containerID||data
+    private void parseChunkEntry(String entry) {
+        // Format: Chunk{chunkAddress=address, checksum=[checksum], size=size, referenceCount=referenceCount}
         try {
-            String checksum = parts[1];
-            long size = Long.parseLong(parts[2]);
-            long address = Long.parseLong(parts[3]);
-            long containerID = Long.parseLong(parts[4]);
-            byte[] data = Base64.getDecoder().decode(parts[5]);
-
             Chunk chunk = new Chunk();
-            chunk.setSize(size);
-            chunk.setChunkAddress(address);
-            chunk.setData(data);
-            chunk.setChecksum(hexToBytes(checksum));
+            chunk.parseString(entry);
 
+            String checksum = Arrays.toString(chunk.getChecksum());
             chunkMap.put(checksum, chunk);
             chunkReferences.put(checksum, 0); // Will be updated when processing recipes
         } catch (Exception e) {
@@ -201,60 +189,25 @@ public class Indexing {
         }
     }
 
-    private void parseContainerEntry(String[] parts) {
-        // Format: CONTAINER||containerID||size||maxSize||chunkChecksums
+    private void parseContainerEntry(String entry) {
         try {
-            long containerID = Long.parseLong(parts[1]);
-            long size = Long.parseLong(parts[2]);
-            long maxSize = Long.parseLong(parts[3]);
-            String[] checksums = parts[4].split(",");
+            Container container = new Container();
+            container.parseString(entry);
 
-            Container container = new Container(maxSize, containerID);
-            container.setSize(size);
-
-            for (String checksum : checksums) {
-                if (!checksum.isEmpty()) {
-                    Chunk chunk = chunkMap.get(checksum);
-                    if (chunk != null) {
-                        container.addToContainer(chunk);
-                    }
-                }
-            }
-
-            containerMap.computeIfAbsent(String.valueOf(containerID), k -> new ArrayList<>())
+            containerMap.computeIfAbsent(String.valueOf(container.containerID), k -> new ArrayList<>())
                        .add(container);
-            nextContainerID = Math.max(nextContainerID, containerID + 1);
+            nextContainerID = Math.max(nextContainerID, container.containerID + 1);
         } catch (Exception e) {
             System.err.println("Error parsing container entry: " + e.getMessage());
         }
     }
 
-    private String serializeChunkEntry(String checksum, Chunk chunk) {
-        // Format: CHUNK||checksum||size||address||containerID||data
-        return String.join(DELIMITER,
-            "CHUNK",
-            checksum,
-            String.valueOf(chunk.getSize()),
-            String.valueOf(chunk.getChunkAddress()),
-            String.valueOf(chunk.getContainerID()),
-            Base64.getEncoder().encodeToString(chunk.getData())
-        );
+    public String serializeChunkEntry(Chunk chunk) {
+        return chunk.toString();
     }
 
-    private String serializeContainer(Container container) {
-        // Format: CONTAINER||containerID||size||maxSize||chunkChecksums
-        String checksums = container.chunkContents.stream()
-            .map(chunk -> bytesToHex(chunk.getChecksum()))
-            .reduce((a, b) -> a + "," + b)
-            .orElse("");
-
-        return String.join(DELIMITER,
-            "CONTAINER",
-            String.valueOf(container.getContainerID()),
-            String.valueOf(container.getSize()),
-            String.valueOf(container.getMaxSize()),
-            checksums
-        );
+    public String serializeContainer(Container container) {
+        return container.toString();
     }
 
     private byte[] hexToBytes(String hex) {
