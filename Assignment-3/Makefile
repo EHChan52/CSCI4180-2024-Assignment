@@ -8,7 +8,7 @@
 # FILE_TO_DELETE = delete.txt
 
 # Java files
-JAVA_FILES = MyDedup.java Chunking.java Chunk.java Container.java FingerprintIndex.java Indexing.java WrapToContainer.java RFP.java Anchoring.java
+JAVA_FILES = MyDedup.java Chunking.java Chunk.java Container.java Indexing.java WrapToContainer.java RFP.java Anchoring.java
 
 # Targets
 upload:

@@ -1,6 +1,5 @@
 import java.io.*;
 import java.util.*;
-import java.util.ArrayList;
 
 public class Indexing {
     private Map<String, Chunk> chunkMap; // Maps checksum to chunk
@@ -13,19 +12,53 @@ public class Indexing {
     private static final String RECIPE_DIR = "recipes";
     private static final String DATA_DIR = "data";
 
-    public Indexing() {
-        chunkMap = new HashMap<>();
-        containerMap = new HashMap<>();
-        fileRecipes = new HashMap<>();
-        chunkReferences = new HashMap<>();
-        nextContainerID = 0;
-        initializeDirectories();
-        loadIndex();
+    // public Indexing() {
+    //     chunkMap = new HashMap<>();
+    //     containerMap = new HashMap<>();
+    //     fileRecipes = new HashMap<>();
+    //     chunkReferences = new HashMap<>();
+    //     nextContainerID = 0;
+    //     initializeDirectories();
+    //     loadIndex();
+    // }
+
+    // private void initializeDirectories() {
+    //     new File(RECIPE_DIR).mkdirs();
+    //     new File(DATA_DIR).mkdirs();
+    // }
+
+    public static ArrayList<Chunk> loadIndex(File indexFile) {
+        ArrayList<Chunk> chunkMetadata = new ArrayList<>();
+        if (indexFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(indexFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    try {
+                        Chunk chunk = new Chunk();
+                        chunk.parseString(line);
+            
+                        chunkMetadata.add(chunk);
+                    } catch (Exception e) {
+                        System.err.println("Error parsing chunk entry: " + e.getMessage());
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error loading index: " + e.getMessage());
+            }
+            return chunkMetadata;
+        } else {
+            return null;
+        }
     }
 
-    private void initializeDirectories() {
-        new File(RECIPE_DIR).mkdirs();
-        new File(DATA_DIR).mkdirs();
+    public static  void saveIndex(File indexFile, ArrayList<Chunk> chunks) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(indexFile))) {
+            for (Chunk chunk : chunks) {
+                writer.println(chunk.toString());
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving index: " + e.getMessage());
+        }
     }
 
     public void processNewFile(String filename, ArrayList<Chunk> chunks, ArrayList<Container> containers) {
@@ -166,41 +199,6 @@ public class Indexing {
                 }
             }
         }
-    }
-
-    public static ArrayList<Chunk> loadIndex(File indexFile) {
-        ArrayList<Chunk> chunkMetadata = new ArrayList<>();
-        if (indexFile.exists()) {
-            try (BufferedReader reader = new BufferedReader(new FileReader(indexFile))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    try {
-                        Chunk chunk = new Chunk();
-                        chunk.parseString(line);
-            
-                        chunkMetadata.add(chunk);
-                    } catch (Exception e) {
-                        System.err.println("Error parsing chunk entry: " + e.getMessage());
-                    }
-                }
-            } catch (IOException e) {
-                System.err.println("Error loading index: " + e.getMessage());
-            }
-            return chunkMetadata;
-        } else {
-            return null;
-        }
-    }
-
-    private void saveIndex() {
-        // try (PrintWriter writer = new PrintWriter(new FileWriter(INDEX_FILE))) {
-        //     // Write chunk information
-        //     for (Map.Entry<String, Chunk> entry : chunkMap.entrySet()) {
-        //         writer.println(serializeChunkEntry(entry.getValue()));
-        //     }
-        // } catch (IOException e) {
-        //     System.err.println("Error saving index: " + e.getMessage());
-        // }
     }
 
     private void saveFileRecipe(String filename, List<String> recipe) {

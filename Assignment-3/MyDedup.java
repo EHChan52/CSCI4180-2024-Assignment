@@ -18,7 +18,7 @@ class MyDedup {
 
 
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
-
+        ArrayList<Chunk> chunkMetadata = new ArrayList<>();
         // Create mydedup.data file if it does not exist
         File indexFile = new File("mydedup.index");
         if (!indexFile.exists()) {
@@ -33,6 +33,7 @@ class MyDedup {
             }
         } else {
             System.out.println("mydedup.index file already exists.");
+            chunkMetadata = Indexing.loadIndex(indexFile);
         }
 
         // Create data folder if it does not exist
@@ -121,8 +122,9 @@ class MyDedup {
                             System.out.println("An error occurred while writing to containerList.txt file.");
                         }
 
+                        Indexing.saveIndex(indexFile, chunkMetadata);
 
-
+                        
                     }
                 }
             } catch (NumberFormatException e) {

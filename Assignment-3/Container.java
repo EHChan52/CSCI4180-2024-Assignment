@@ -1,3 +1,4 @@
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,19 +53,29 @@ public class Container {
         this.chunkContents = chunkContents;
     }
 
-    public void getChunkContents(ArrayList<Chunk> chunkContents) {
-        return chunkContents;
+    public ArrayList<Chunk> getChunkContents() {
+        return this.chunkContents;
     }
-
+    
     @Override
     public String toString() {
-        return "Container{" +
-                "containerID=" + containerID +
-                ", size=" + size +
-                ", maxSize=" + maxSize +
-                ", chunkContents=" + chunkContents +
-                ", safeToDelete=" + safeToDelete +
-                '}';
+        StringBuilder chunkContentsStr = new StringBuilder();
+        chunkContentsStr.append("ContainerID=").append(containerID)
+                        .append(", Size=").append(size)
+                        .append(", MaxSize=").append(maxSize)
+                        .append(System.lineSeparator());
+    
+        for (Chunk chunk : chunkContents) {
+            chunkContentsStr.append("Chunk{")
+                            .append("Checksum=").append(Arrays.toString(chunk.getChecksum()))
+                            .append(", Size=").append(chunk.getSize())
+                            .append(", Offset=").append(chunk.getOffset())
+                            .append(", Data=").append(Arrays.toString(chunk.getData()))
+                            .append("}")
+                            .append(System.lineSeparator());
+        }
+    
+        return chunkContentsStr.toString();
     }
 
     public void parseString(String entry) {
