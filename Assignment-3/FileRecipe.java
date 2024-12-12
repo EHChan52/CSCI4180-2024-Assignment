@@ -24,9 +24,10 @@ public class FileRecipe {
     
     @Override
     public String toString() {
-        return "FileRecipe{" +
-                "fileName='" + fileName + '\'' +
-                ", chunkList=" + chunkList +
-                '}';
+        String chunkListString = "";
+        for (Chunk chunk : chunkList) {
+            chunkListString += chunk.toString() + "\n";
+        }
+        return chunkListString;
     }
 }

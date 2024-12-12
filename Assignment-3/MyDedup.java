@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -46,6 +47,33 @@ class MyDedup {
             }
         } else {
             System.out.println("data folder already exists.");
+            File[] containerFiles = dataFolder.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    return name.startsWith("container-");
+                }
+            });
+            if (containerFiles != null) {
+                for (File file : containerFiles) {
+                    System.out.println("Found container file: " + file.getName());
+                }
+            } else {
+                System.out.println("No container files found.");
+            }
+
+            File[] recipeFiles = dataFolder.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    return name.startsWith("recipe-");
+                }
+            });
+            if (recipeFiles != null) {
+                for (File file : recipeFiles) {
+                    System.out.println("Found recipe file: " + file.getName());
+                }
+            } else {
+                System.out.println("No recipe files found.");
+            }
         }
 
         if("upload".equals(args[0]) && args.length == 5){
@@ -123,8 +151,8 @@ class MyDedup {
                         }
 
                         Indexing.saveIndex(indexFile, chunkMetadata);
+                        Indexing.saveContainer(indexFile, containerList);
 
-                        
                     }
                 }
             } catch (NumberFormatException e) {

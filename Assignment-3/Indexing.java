@@ -63,7 +63,7 @@ public class Indexing {
         }
     }
 
-    public static void loadContainer(File containerFile, ArrayList<Container> containers) {
+    public static void loadContainer(File containerFile) {
         if (containerFile.exists()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(containerFile))) {
                 String line;
@@ -76,16 +76,44 @@ public class Indexing {
         }
     }
 
-    public static void saveContainer(File containerFile, ArrayList<Container> containers) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(containerFile))) {
-            for (Container container : containers) {
-                writer.println(container.toString());
-            }
-        } catch (IOException e) {
-            System.err.println("Error saving container: " + e.getMessage());
-        }
+    public static void saveContainer(File[] containerFiles, ArrayList<Container> containers) {
+        
     }
 
+    public static FileRecipe loadRecipe(File recipeFile) {
+        FileRecipe recipe = new FileRecipe();
+        ArrayList<Chunk> chunkList = new ArrayList<>();
+        if (recipeFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(recipeFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    try {
+                        Chunk chunk = new Chunk();
+                        chunk.parseString(line);
+                        chunkList.add(chunk);
+                    } catch (Exception e) {
+                        System.err.println("Error parsing chunk entry: " + e.getMessage());
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error loading recipe: " + e.getMessage());
+            }
+            recipe.setFileName(recipeFile.getName().replace("recipe-", ""));
+            recipe.setChunkList(chunkList);
+            return recipe;
+        }
+        return null;
+    }
+
+    public static void saveRecipe(File recipeFile, FileRecipe recipe) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(recipeFile))) {
+            for (Chunk chunk : recipe.getChunkList()) {
+                writer.println(chunk.toString());
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving recipe: " + e.getMessage());
+        }
+    }
 
     //download file
     public void downloadFile(String filename) {
