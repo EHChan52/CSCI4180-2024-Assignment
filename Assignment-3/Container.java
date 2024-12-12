@@ -6,7 +6,7 @@ public class Container {
     public long containerID;
     public long size;
     public long maxSize;
-    public ArrayList<Chunk> chunkContents = new ArrayList<>();
+    public ArrayList<Chunk> chunkContents = new ArrayList<Chunk>();
     public boolean safeToDelete = false;
 
     public Container() {}
@@ -46,6 +46,14 @@ public class Container {
 
     public void removeFromContainer(Chunk chunk1) {
         chunkContents.remove(chunk1);
+    }
+
+    public void setChunkContents(ArrayList<Chunk> chunkContents) {
+        this.chunkContents = chunkContents;
+    }
+
+    public void getChunkContents(ArrayList<Chunk> chunkContents) {
+        return chunkContents;
     }
 
     @Override

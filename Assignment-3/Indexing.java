@@ -1,6 +1,6 @@
-import java.awt.Container;
 import java.io.*;
 import java.util.*;
+import java.util.ArrayList;
 
 public class Indexing {
     private Map<String, Chunk> chunkMap; // Maps checksum to chunk
@@ -104,6 +104,7 @@ public class Indexing {
 
     // end of download file
 
+    //delete file
     public void deleteFile(String filename) {
         List<String> recipe = fileRecipes.get(filename);
         if (recipe == null) {
@@ -127,13 +128,40 @@ public class Indexing {
         saveIndex();
     }
 
+    //testing
+    private void deleteEmptyContainers() {
+        List<String> containersToDelete = new ArrayList<>();
+        for (Map.Entry<String, List<Container>> entry : containerMap.entrySet()) {
+            List<Container> containers = entry.getValue();
+            containers.removeIf(container -> {
+                if (container.getSafeToDelete()) {
+                    containersToDelete.add(String.valueOf(container.getContainerID()));
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        // Physically remove the containers from the storage backend
+        for (String containerId : containersToDelete) {
+            File containerFile = new File(DATA_DIR + File.separator + containerId);
+            if (containerFile.exists()) {
+                containerFile.delete();
+            }
+        }
+    }
+
+    //end of testing
+
     private void markContainerForDeletion(Chunk chunk) {
         // Find and mark containers that might be eligible for deletion
         for (List<Container> containers : containerMap.values()) {
             for (Container container : containers) {
-                if (container.chunkContents.contains(chunk)) {
-                    boolean allChunksUnreferenced = container.chunkContents.stream()
-                        .allMatch(c -> !chunkMap.containsKey(bytesToHex(c.getChecksum())));
+                Array<Chunk> currentChunkContents = container.getChunkContents();
+                if (currentChunkContents.contains(chunk)) {
+                    boolean allChunksUnreferenced = currentChunkContents.stream()
+                        .allMatch(c -> chunkReferences.getOrDefault(bytesToHex(c.getChecksum()), 0) == 0);
+                    // .allMatch(c -> !chunkMap.containsKey(bytesToHex(c.getChecksum())));
                     container.setSafeToDelete(allChunksUnreferenced);
                 }
             }
