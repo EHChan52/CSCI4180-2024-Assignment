@@ -194,7 +194,7 @@ class MyDedup {
             } 
             else {
                 System.out.println("File " + args[4] + " exists. Proceeding with upload.");
-                Indexing.downloadFile(fileToDownload, localFileName, chunkMetadata);
+                // Indexing.downloadFile(fileToDownload, localFileName, chunkMetadata);
                 
             }
 
