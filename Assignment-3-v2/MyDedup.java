@@ -7,14 +7,14 @@ import java.security.NoSuchAlgorithmException;
 public class MyDedup {
   public static final int d = 257;
 
-  public static class ChunkIndex implements Serializable { // struct to record the info about chunk
-    public String containerID; // container that the chunk is located at
-    public int offset; // offset of starting point of chunk
-    public int chunkSize; // size of chunk
-    public int refCount; // reference count
+  public static class ChunkMetadata implements Serializable {
+    public String containerId;
+    public int offset;
+    public int chunkSize; 
+    public int refCount;
 
-    public ChunkIndex() {
-      this.containerID = new String();
+    public ChunkMetadata() {
+      this.containerId = new String();
       this.offset = 0;
       this.chunkSize = 0;
       this.refCount = 0;
@@ -22,31 +22,31 @@ public class MyDedup {
   }
 
   public static class FileRecipes implements Serializable {
-    public HashMap<String, List<ChunkIndex>> recipe; // (filename, list of chunks)
+    public HashMap<String, List<ChunkMetadata>> recipe;
 
     public FileRecipes() {
-      this.recipe = new HashMap<String, List<ChunkIndex>>();
+      this.recipe = new HashMap<String, List<ChunkMetadata>>();
     }
   }
 
-  public static class IndexFile implements Serializable {
-    public int num_files;
-    public long logical_chunks;
-    public long unique_chunks;
-    public long logical_bytes;
-    public long unique_bytes;
-    public int container_no;
-    public HashMap<String, ChunkIndex> index; // (checksum, chunkIndex)
+  public static class FingerprintIndexing implements Serializable {
+    public int numOfFiles;
+    public long logicalChunks;
+    public long uniqueChunks;
+    public long logicalBytes;
+    public long uniqueBytes;
+    public int containerNo;
+    public HashMap<String, ChunkMetadata> index; // (checksum, chunkIndex)
 
-    public IndexFile() {
-      this.num_files = 0;
-      this.logical_chunks = 0L;
-      this.unique_chunks = 0L;
-      this.logical_bytes = 0L;
-      this.unique_bytes = 0L;
-      this.container_no = 0;
+    public FingerprintIndexing() {
+      this.numOfFiles = 0;
+      this.logicalChunks = 0L;
+      this.uniqueChunks = 0L;
+      this.logicalBytes = 0L;
+      this.uniqueBytes = 0L;
+      this.containerNo = 0;
 
-      this.index = new HashMap<String, ChunkIndex>();
+      this.index = new HashMap<String, ChunkMetadata>();
     }
   }
 
@@ -66,12 +66,10 @@ public class MyDedup {
     return result % q;
   }
 
-  public static List<Integer> computeBoundaries(byte[] input, int m, int q, int max) {
-    // m: min_chunk (window size), d: multiplier, q: avg_chunk (modulo), max:
-    // max_chunk
+  public static List<Integer> computeBoundaries(byte[] input, int minChunk, int avgChunk, int maxChunk) {
+    // m: min_chunk (window size), d: multiplier, q: avg_chunk (modulo), max: max_chunk
 
-    // m, q, max should be power of 2
-    if ((m & (m - 1)) != 0 || (q & (q - 1)) != 0 || (max & (max - 1)) != 0) {
+    if ((minChunk & (minChunk - 1)) != 0 || (avgChunk & (avgChunk - 1)) != 0 || (maxChunk & (maxChunk - 1)) != 0) {
       System.out.println("minChunk, avgChunk, maxChunk should be power of 2");
       System.exit(1);
     }
@@ -79,12 +77,12 @@ public class MyDedup {
     List<Integer> boundaries = new ArrayList<Integer>(); // boundary = starting position of chunk
     boundaries.add(0); // create first boundary at index 0
 
-    int dm1 = dMod(d, m - 1, q); // precompute d^m-1
+    int dm1 = dMod(d, minChunk - 1, avgChunk); // precompute d^m-1
     int prev = 0;
 
-    for (int s = 0; s + m <= input.length; s++) {
+    for (int s = 0; s + minChunk <= input.length; s++) {
       // create boundary if reaches max_chunk limit
-      if ((s - boundaries.get(boundaries.size() - 1) + 1) >= max) {
+      if ((s - boundaries.get(boundaries.size() - 1) + 1) >= maxChunk) {
         boundaries.add(s + 1);
         continue;
       }
@@ -92,19 +90,19 @@ public class MyDedup {
       // calculate rfp
       int rfp = 0;
       if (s == 0 || s == boundaries.get(boundaries.size() - 1)) {
-        for (int i = 0; i < m; i++) {
-          rfp += (input[s + i] * dMod(d, m - i, q)) % q;
+        for (int i = 0; i < minChunk; i++) {
+          rfp += (input[s + i] * dMod(d, minChunk - i, avgChunk)) % avgChunk;
         }
       } else {
-        rfp = d * (prev - dm1 * input[s - 1]) + input[s + m - 1];
+        rfp = d * (prev - dm1 * input[s - 1]) + input[s + minChunk - 1];
       }
-      rfp = rfp % q;
+      rfp = rfp % avgChunk;
       prev = rfp;
 
       // create boundary
-      if ((rfp & (q - 1)) == 0 && s + m < input.length) {
-        boundaries.add(s + m);
-        s = s + m - 1;
+      if ((rfp & (avgChunk - 1)) == 0 && s + minChunk < input.length) {
+        boundaries.add(s + minChunk);
+        s = s + minChunk - 1;
       }
     }
 
@@ -121,25 +119,25 @@ public class MyDedup {
           System.out.println("Not enough arguments.");
           System.exit(1);
         } else {
-          int m = Integer.parseInt(args[1]);
-          int q = Integer.parseInt(args[2]);
-          int max = Integer.parseInt(args[3]);
+          int minChunk = Integer.parseInt(args[1]);
+          int avgChunk = Integer.parseInt(args[2]);
+          int maxChunk = Integer.parseInt(args[3]);
 
-          File f = new File(args[4]);
+          File file = new File(args[4]);
 
           // Moved fileRecipes to here
           FileRecipes fileRecipes;
-          File f_recipes = new File("data/filerecipes.index");
+          File fileRecipesFile = new File("data/filerecipes.index");
           // load file recipes
-          if (!f_recipes.exists()) {
-            f_recipes.getParentFile().mkdirs();
-            f_recipes.createNewFile();
+          if (!fileRecipesFile.exists()) {
+            fileRecipesFile.getParentFile().mkdirs();
+            fileRecipesFile.createNewFile();
             fileRecipes = new FileRecipes();
           } else {
-            FileInputStream fin_recipes = new FileInputStream(f_recipes);
-            ObjectInputStream oin_recipes = new ObjectInputStream(fin_recipes);
-            fileRecipes = (FileRecipes) oin_recipes.readObject();
-            oin_recipes.close();
+            FileInputStream finRecipes = new FileInputStream(fileRecipesFile);
+            ObjectInputStream oinRecipes = new ObjectInputStream(finRecipes);
+            fileRecipes = (FileRecipes) oinRecipes.readObject();
+            oinRecipes.close();
 
             // Check if filename exists in the list of files
             for (String filename : fileRecipes.recipe.keySet()) {
@@ -150,45 +148,45 @@ public class MyDedup {
             }
           }
 
-          FileInputStream file_to_upload = new FileInputStream(f);
-          byte[] data = new byte[(int) f.length()];
-          file_to_upload.read(data);
-          file_to_upload.close();
+          FileInputStream fileToUpload = new FileInputStream(file);
+          byte[] data = new byte[(int) file.length()];
+          fileToUpload.read(data);
+          fileToUpload.close();
 
           // separate files into chunks
-          List<Integer> boundaries = computeBoundaries(data, m, q, max);
+          List<Integer> boundaries = computeBoundaries(data, minChunk, avgChunk, maxChunk);
 
-          int num_files;
-          long logical_chunks;
-          long unique_chunks;
-          long logical_bytes;
-          long unique_bytes;
-          int container_no;
+          int numOfFiles;
+          long logicalChunks;
+          long uniqueChunks;
+          long logicalBytes;
+          long uniqueBytes;
+          int containerNo;
 
           // load index
-          IndexFile indexFile;
-          File f_index = new File("data/mydedup.index");
-          if (!f_index.exists()) {
-            f_index.getParentFile().mkdirs();
-            f_index.createNewFile();
-            indexFile = new IndexFile();
-            num_files = 0;
-            logical_chunks = 0;
-            unique_chunks = 0;
-            logical_bytes = 0;
-            unique_bytes = 0;
-            container_no = 0;
+          FingerprintIndexing indexFile;
+          File indexFileFile = new File("data/mydedup.index");
+          if (!indexFileFile.exists()) {
+            indexFileFile.getParentFile().mkdirs();
+            indexFileFile.createNewFile();
+            indexFile = new FingerprintIndexing();
+            numOfFiles = 0;
+            logicalChunks = 0;
+            uniqueChunks = 0;
+            logicalBytes = 0;
+            uniqueBytes = 0;
+            containerNo = 0;
           } else {
-            FileInputStream fin_index = new FileInputStream(f_index);
-            ObjectInputStream oin_index = new ObjectInputStream(fin_index);
-            indexFile = (IndexFile) oin_index.readObject();
-            oin_index.close();
-            num_files = indexFile.num_files;
-            logical_chunks = indexFile.logical_chunks;
-            unique_chunks = indexFile.unique_chunks;
-            logical_bytes = indexFile.logical_bytes;
-            unique_bytes = indexFile.unique_bytes;
-            container_no = indexFile.container_no;
+            FileInputStream finIndex = new FileInputStream(indexFileFile);
+            ObjectInputStream oinIndex = new ObjectInputStream(finIndex);
+            indexFile = (FingerprintIndexing) oinIndex.readObject();
+            oinIndex.close();
+            numOfFiles = indexFile.numOfFiles;
+            logicalChunks = indexFile.logicalChunks;
+            uniqueChunks = indexFile.uniqueChunks;
+            logicalBytes = indexFile.logicalBytes;
+            uniqueBytes = indexFile.uniqueBytes;
+            containerNo = indexFile.containerNo;
           }
 
           // prepare container
@@ -196,15 +194,15 @@ public class MyDedup {
           if (!dir.exists()) {
             dir.mkdirs();
           }
-          File containerFile = new File("data/container_" + (container_no + 1));
+          File containerFile = new File("data/container_" + (containerNo + 1));
           if (!containerFile.exists()) {
             containerFile.createNewFile();
           }
-          FileOutputStream container_out = new FileOutputStream(containerFile);
+          FileOutputStream containerOut = new FileOutputStream(containerFile);
           ByteArrayOutputStream container = new ByteArrayOutputStream();
           int currentContainerBytes = 0;
 
-          List<ChunkIndex> chunkList = new ArrayList<ChunkIndex>();
+          List<ChunkMetadata> chunkList = new ArrayList<ChunkMetadata>();
 
           for (int i = 0; i < boundaries.size(); i++) {
 
@@ -216,43 +214,43 @@ public class MyDedup {
               // System.out.println(containerFile.getName());
               // System.out.println(currentContainerBytes+currentChunk.length);
               if (currentContainerBytes + currentChunk.length > 1048576) {
-                container.writeTo(container_out);
+                container.writeTo(containerOut);
                 container.reset();
                 currentContainerBytes = 0;
-                container_no++;
-                containerFile = new File("data/container_" + (container_no + 1));
+                containerNo++;
+                containerFile = new File("data/container_" + (containerNo + 1));
                 containerFile.createNewFile();
-                container_out = new FileOutputStream(containerFile);
+                containerOut = new FileOutputStream(containerFile);
               }
-              ChunkIndex currentChunkIndex = new ChunkIndex();
-              currentChunkIndex.containerID = containerFile.getName();
-              currentChunkIndex.offset = currentContainerBytes;
-              currentChunkIndex.chunkSize = currentChunk.length;
-              currentChunkIndex.refCount = 1;
+              ChunkMetadata currentChunkMetadata = new ChunkMetadata();
+              currentChunkMetadata.containerId = containerFile.getName();
+              currentChunkMetadata.offset = currentContainerBytes;
+              currentChunkMetadata.chunkSize = currentChunk.length;
+              currentChunkMetadata.refCount = 1;
               container.write(currentChunk);
-              chunkList.add(currentChunkIndex);
-              indexFile.index.put(hash, currentChunkIndex);
+              chunkList.add(currentChunkMetadata);
+              indexFile.index.put(hash, currentChunkMetadata);
               currentContainerBytes += currentChunk.length;
-              unique_chunks += 1L;
-              unique_bytes += (long) currentChunk.length;
+              uniqueChunks += 1L;
+              uniqueBytes += (long) currentChunk.length;
 
             } else {
-              ChunkIndex currentChunkIndex = indexFile.index.get(hash);
-              chunkList.add(currentChunkIndex);
-              currentChunkIndex.refCount++;
+              ChunkMetadata currentChunkMetadata = indexFile.index.get(hash);
+              chunkList.add(currentChunkMetadata);
+              currentChunkMetadata.refCount++;
             }
 
             if (i == boundaries.size() - 1 && currentContainerBytes > 0) { // tail container
-              container.writeTo(container_out);
+              container.writeTo(containerOut);
             }
 
-            logical_chunks += 1L;
-            logical_bytes += (long) currentChunk.length;
+            logicalChunks += 1L;
+            logicalBytes += (long) currentChunk.length;
           }
-          container_out.close();
+          containerOut.close();
 
           fileRecipes.recipe.put(args[4], chunkList);
-          num_files++;
+          numOfFiles++;
 
           // clean empty containers
           File containerDir = new File("data/");
@@ -263,28 +261,28 @@ public class MyDedup {
               }
             }
           }
-          // adjust container_no to the max containerid
-          container_no = (int) Arrays.stream(containerDir.list()).filter(s -> s.startsWith("container_"))
+          // adjust containerNo to the max containerid
+          containerNo = (int) Arrays.stream(containerDir.list()).filter(s -> s.startsWith("container_"))
               .map(s -> Integer.parseInt(s.substring(10))).max(Integer::compare).orElse(0);
 
           // update stat in index file
-          indexFile.num_files = num_files;
-          indexFile.logical_chunks = logical_chunks;
-          indexFile.unique_chunks = unique_chunks;
-          indexFile.logical_bytes = logical_bytes;
-          indexFile.unique_bytes = unique_bytes;
-          indexFile.container_no = container_no;
+          indexFile.numOfFiles = numOfFiles;
+          indexFile.logicalChunks = logicalChunks;
+          indexFile.uniqueChunks = uniqueChunks;
+          indexFile.logicalBytes = logicalBytes;
+          indexFile.uniqueBytes = uniqueBytes;
+          indexFile.containerNo = containerNo;
 
           // update index and file recipe
-          FileOutputStream fout_index = new FileOutputStream(f_index, false);
-          ObjectOutputStream oout_index = new ObjectOutputStream(fout_index);
-          oout_index.writeObject(indexFile);
-          oout_index.close();
+          FileOutputStream foutIndex = new FileOutputStream(indexFileFile, false);
+          ObjectOutputStream ooutIndex = new ObjectOutputStream(foutIndex);
+          ooutIndex.writeObject(indexFile);
+          ooutIndex.close();
 
-          FileOutputStream fout_recipes = new FileOutputStream(f_recipes, false);
-          ObjectOutputStream oout_recipes = new ObjectOutputStream(fout_recipes);
-          oout_recipes.writeObject(fileRecipes);
-          oout_recipes.close();
+          FileOutputStream foutRecipes = new FileOutputStream(fileRecipesFile, false);
+          ObjectOutputStream ooutRecipes = new ObjectOutputStream(foutRecipes);
+          ooutRecipes.writeObject(fileRecipes);
+          ooutRecipes.close();
 
           int totalContainers = 0;
           if (containerDir.exists() && containerDir.isDirectory()) {
@@ -294,13 +292,13 @@ public class MyDedup {
           }
 
           // report statistics
-          System.out.println("Total number of files that have been stored: " + num_files);
-          System.out.println("Total number of pre-deduplicated chunks in storage: " + logical_chunks);
-          System.out.println("Total number of unique chunks in storage: " + unique_chunks);
-          System.out.println("Total number of bytes of pre-deduplicated chunks in storage: " + logical_bytes);
-          System.out.println("Total number of bytes of unique chunks in storage: " + unique_bytes);
+          System.out.println("Total number of files that have been stored: " + numOfFiles);
+          System.out.println("Total number of pre-deduplicated chunks in storage: " + logicalChunks);
+          System.out.println("Total number of unique chunks in storage: " + uniqueChunks);
+          System.out.println("Total number of bytes of pre-deduplicated chunks in storage: " + logicalBytes);
+          System.out.println("Total number of bytes of unique chunks in storage: " + uniqueBytes);
           System.out.println("Total number of containers in storage: " + totalContainers);
-          System.out.println("Deduplication ratio: " + ((float) logical_bytes / unique_bytes));
+          System.out.println("Deduplication ratio: " + ((float) logicalBytes / uniqueBytes));
         }
         break;
 
@@ -309,25 +307,25 @@ public class MyDedup {
           System.out.println("Not enough arguments.");
           System.exit(1);
         } else {
-          FileInputStream fin_recipe = new FileInputStream("data/filerecipes.index");
-          ObjectInputStream oin_recipe = new ObjectInputStream(fin_recipe);
-          FileRecipes fileRecipes = (FileRecipes) oin_recipe.readObject();
+          FileInputStream finRecipe = new FileInputStream("data/filerecipes.index");
+          ObjectInputStream oinRecipe = new ObjectInputStream(finRecipe);
+          FileRecipes fileRecipes = (FileRecipes) oinRecipe.readObject();
           if (!fileRecipes.recipe.containsKey(args[1])) {
             System.out.println("Error: \"" + args[1] + "\" does not exist");
             System.exit(1);
           }
-          List<ChunkIndex> chunkList = fileRecipes.recipe.get(args[1]);
-          oin_recipe.close();
+          List<ChunkMetadata> chunkList = fileRecipes.recipe.get(args[1]);
+          oinRecipe.close();
 
           ByteArrayOutputStream data = new ByteArrayOutputStream();
           for (int i = 0; i < chunkList.size(); i++) {
-            ChunkIndex currentChunk = chunkList.get(i);
-            FileInputStream fin_container = new FileInputStream("data/" + currentChunk.containerID);
-            fin_container.skip(currentChunk.offset);
+            ChunkMetadata currentChunk = chunkList.get(i);
+            FileInputStream finContainer = new FileInputStream("data/" + currentChunk.containerId);
+            finContainer.skip(currentChunk.offset);
             byte[] containerData = new byte[currentChunk.chunkSize];
-            fin_container.read(containerData);
+            finContainer.read(containerData);
             data.write(containerData);
-            fin_container.close();
+            finContainer.close();
           }
 
           File fout = new File(args[2]);
@@ -352,25 +350,25 @@ public class MyDedup {
         String filename = args[1];
 
         // load metadata
-        IndexFile indexFile;
+        FingerprintIndexing indexFile;
         FileRecipes fileRecipes;
-        File f_index = new File("data/mydedup.index");
-        File f_recipe = new File("data/filerecipes.index");
+        File indexFileFile = new File("data/mydedup.index");
+        File fileRecipesFile = new File("data/filerecipes.index");
 
-        if (!f_index.exists() || !f_recipe.exists()) {
+        if (!indexFileFile.exists() || !fileRecipesFile.exists()) {
           System.out.println("No metadata found. Nothing to delete.");
           System.exit(1);
         }
 
-        FileInputStream fin_index = new FileInputStream(f_index);
-        ObjectInputStream oin_index = new ObjectInputStream(fin_index);
-        indexFile = (IndexFile) oin_index.readObject();
-        oin_index.close();
+        FileInputStream finIndex = new FileInputStream(indexFileFile);
+        ObjectInputStream oinIndex = new ObjectInputStream(finIndex);
+        indexFile = (FingerprintIndexing) oinIndex.readObject();
+        oinIndex.close();
 
-        FileInputStream fin_recipe = new FileInputStream(f_recipe);
-        ObjectInputStream oin_recipe = new ObjectInputStream(fin_recipe);
-        fileRecipes = (FileRecipes) oin_recipe.readObject();
-        oin_recipe.close();
+        FileInputStream finRecipe = new FileInputStream(fileRecipesFile);
+        ObjectInputStream oinRecipe = new ObjectInputStream(finRecipe);
+        fileRecipes = (FileRecipes) oinRecipe.readObject();
+        oinRecipe.close();
 
         // check if the file exist in FileRecipes
         if (!fileRecipes.recipe.containsKey(filename)) {
@@ -379,18 +377,18 @@ public class MyDedup {
         }
 
         // get the list of chunks for the file
-        List<ChunkIndex> chunkList = fileRecipes.recipe.get(filename);
+        List<ChunkMetadata> chunkList = fileRecipes.recipe.get(filename);
 
         // Map to track how many times each chunk is referenced within the file
         Map<String, Integer> chunkReferenceCount = new HashMap<>();
 
         // Calculate the reference count for each chunk in the file
-        for (ChunkIndex chunk : chunkList) {
+        for (ChunkMetadata chunk : chunkList) {
           String chunkHash = null;
 
           // Find the hash of the chunk in the index
-          for (Map.Entry<String, ChunkIndex> entry : indexFile.index.entrySet()) {
-            if (entry.getValue().containerID.equals(chunk.containerID)
+          for (Map.Entry<String, ChunkMetadata> entry : indexFile.index.entrySet()) {
+            if (entry.getValue().containerId.equals(chunk.containerId)
                 && entry.getValue().offset == chunk.offset
                 && entry.getValue().chunkSize == chunk.chunkSize) {
               chunkHash = entry.getKey();
@@ -409,15 +407,15 @@ public class MyDedup {
         long deletedLogicalBytes = 0; // track bytes deleted
         long deletedLogicalChunks = 0; // track chunks deleted
 
-        for (ChunkIndex chunk : chunkList) {
+        for (ChunkMetadata chunk : chunkList) {
           deletedLogicalChunks++;
           deletedLogicalBytes += chunk.chunkSize;
 
           String chunkHash = null;
 
           // find the hash of the chunk in the index
-          for (Map.Entry<String, ChunkIndex> entry : indexFile.index.entrySet()) {
-            if (entry.getValue().containerID.equals(chunk.containerID)
+          for (Map.Entry<String, ChunkMetadata> entry : indexFile.index.entrySet()) {
+            if (entry.getValue().containerId.equals(chunk.containerId)
                 && entry.getValue().offset == chunk.offset
                 && entry.getValue().chunkSize == chunk.chunkSize) {
               chunkHash = entry.getKey();
@@ -426,7 +424,7 @@ public class MyDedup {
           }
 
           if (chunkHash != null) {
-            ChunkIndex chunkIndex = indexFile.index.get(chunkHash);
+            ChunkMetadata chunkIndex = indexFile.index.get(chunkHash);
             int referencesInFile = chunkReferenceCount.getOrDefault(chunkHash, 0);
 
             // Decrement the refCount by the number of references in the file
@@ -435,13 +433,13 @@ public class MyDedup {
             if (chunkIndex.refCount <= 0) {
               // Remove the chunk from the index if it's no longer referenced
               indexFile.index.remove(chunkHash);
-              indexFile.unique_chunks--;
-              indexFile.unique_bytes -= chunk.chunkSize;
+              indexFile.uniqueChunks--;
+              indexFile.uniqueBytes -= chunk.chunkSize;
             }
           }
 
           // rewrite the container to remove the deleted file's chunks
-          String containerId = chunk.containerID;
+          String containerId = chunk.containerId;
           if (!rewrittenContainers.containsKey(containerId)) {
             rewrittenContainers.put(containerId, new ByteArrayOutputStream());
             newOffsets.put(containerId, 0);
@@ -465,9 +463,9 @@ public class MyDedup {
             newOffsets.put(containerId, newOffset + chunk.chunkSize);
 
             // Update the chunk's offset in the index
-            for (Map.Entry<String, ChunkIndex> entry : indexFile.index.entrySet()) {
-              ChunkIndex indexChunk = entry.getValue();
-              if (indexChunk.containerID.equals(containerId)
+            for (Map.Entry<String, ChunkMetadata> entry : indexFile.index.entrySet()) {
+              ChunkMetadata indexChunk = entry.getValue();
+              if (indexChunk.containerId.equals(containerId)
                   && indexChunk.offset == chunk.offset
                   && indexChunk.chunkSize == chunk.chunkSize) {
                 indexChunk.offset = newOffset;
@@ -499,8 +497,8 @@ public class MyDedup {
 
               // Check if any chunks of this container are still in use
               boolean isContainerUsed = false;
-              for (ChunkIndex chunk : indexFile.index.values()) {
-                if (chunk.containerID.equals(containerFileName)) {
+              for (ChunkMetadata chunk : indexFile.index.values()) {
+                if (chunk.containerId.equals(containerFileName)) {
                   isContainerUsed = true;
                   break;
                 }
@@ -514,31 +512,31 @@ public class MyDedup {
           }
         }
 
-        // reset container_no to max container id
-        indexFile.container_no = (int) Arrays.stream(containerDir.list()).filter(s -> s.startsWith("container_"))
+        // reset containerNo to max container id
+        indexFile.containerNo = (int) Arrays.stream(containerDir.list()).filter(s -> s.startsWith("container_"))
             .map(s -> Integer.parseInt(s.substring(10))).max(Integer::compare).orElse(0);
 
         // update statistics in the index file
-        indexFile.num_files = fileRecipes.recipe.size();
-        indexFile.logical_chunks -= deletedLogicalChunks;
-        indexFile.logical_bytes -= deletedLogicalBytes;
+        indexFile.numOfFiles = fileRecipes.recipe.size();
+        indexFile.logicalChunks -= deletedLogicalChunks;
+        indexFile.logicalBytes -= deletedLogicalBytes;
 
         // save updated metadata
-        FileOutputStream fout_index = new FileOutputStream(f_index, false);
-        ObjectOutputStream oout_index = new ObjectOutputStream(fout_index);
-        oout_index.writeObject(indexFile);
-        oout_index.close();
+        FileOutputStream foutIndex = new FileOutputStream(indexFileFile, false);
+        ObjectOutputStream ooutIndex = new ObjectOutputStream(foutIndex);
+        ooutIndex.writeObject(indexFile);
+        ooutIndex.close();
 
-        FileOutputStream fout_recipe = new FileOutputStream(f_recipe, false);
-        ObjectOutputStream oout_recipe = new ObjectOutputStream(fout_recipe);
-        oout_recipe.writeObject(fileRecipes);
-        oout_recipe.close();
+        FileOutputStream foutRecipe = new FileOutputStream(fileRecipesFile, false);
+        ObjectOutputStream ooutRecipe = new ObjectOutputStream(foutRecipe);
+        ooutRecipe.writeObject(fileRecipes);
+        ooutRecipe.close();
 
         // report statistics
         System.out.println("File \"" + filename + "\" has been deleted.");
-        System.out.println("Total number of files that remain stored: " + indexFile.num_files);
-        System.out.println("Total number of unique chunks in storage: " + indexFile.unique_chunks);
-        System.out.println("Total number of bytes of unique chunks in storage: " + indexFile.unique_bytes);
+        System.out.println("Total number of files that remain stored: " + indexFile.numOfFiles);
+        System.out.println("Total number of unique chunks in storage: " + indexFile.uniqueChunks);
+        System.out.println("Total number of bytes of unique chunks in storage: " + indexFile.uniqueBytes);
       }
         break;
 
