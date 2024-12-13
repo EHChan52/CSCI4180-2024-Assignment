@@ -46,6 +46,14 @@ public class Container {
         chunkContents.remove(chunk1);
     }
 
+    public ArrayList<Chunk> getChunkContents() {
+        return chunkContents;
+    }
+
+    public void setChunkContents(ArrayList<Chunk> chunkContents) {
+        this.chunkContents = chunkContents;
+    }
+
     @Override
     public String toString() {
         return "Container{" +

@@ -65,12 +65,12 @@ public class Indexing {
     public static Container loadContainer(File containerFile) throws IOException {
         try (DataInputStream dis = new DataInputStream(new FileInputStream(containerFile))) {
             // Read container metadata
-            int containerID = dis.readInt();
+            long containerID = dis.readLong(); 
             long size = dis.readLong();
             long maxSize = dis.readLong();
 
             // Create container
-            Container container = new Container(containerID);
+            Container container = new Container(size, containerID);
             container.setSize(size);
 
             // Read chunk data
@@ -91,7 +91,7 @@ public class Indexing {
     public static void saveContainer(File containerFile, Container container) throws IOException {
         try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(containerFile))) {
             // Write container metadata
-            dos.writeInt(container.getContainerID());
+            dos.writeLong(container.getContainerID());
             dos.writeLong(container.getSize());
             dos.writeLong(container.maxSize);
 
