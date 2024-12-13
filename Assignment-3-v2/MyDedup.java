@@ -14,53 +14,8 @@ public class MyDedup {
     private static final String INDEX_FILE = "data/mydedup.index";
     private static final String RECIPE_FILE = "data/filerecipes.index";
 
-    // Chunk Metadata Class
-    public static class ChunkMetadata implements Serializable {
-        public String containerId;
-        public int offset;
-        public int chunkSize;
-        public int refCount;
-
-        public ChunkMetadata() {
-            this.containerId = "";
-            this.offset = 0;
-            this.chunkSize = 0;
-            this.refCount = 0;
-        }
-    }
-
-    // File Recipes Class
-    public static class FileRecipes implements Serializable {
-        public HashMap<String, List<ChunkMetadata>> recipe;
-
-        public FileRecipes() {
-            this.recipe = new HashMap<>();
-        }
-    }
-
-    // Fingerprint Indexing Class
-    public static class FingerprintIndexing implements Serializable {
-        public int numOfFiles;
-        public long logicalChunks;
-        public long uniqueChunks;
-        public long logicalBytes;
-        public long uniqueBytes;
-        public int containerNo;
-        public HashMap<String, ChunkMetadata> index;
-
-        public FingerprintIndexing() {
-            this.numOfFiles = 0;
-            this.logicalChunks = 0L;
-            this.uniqueChunks = 0L;
-            this.logicalBytes = 0L;
-            this.uniqueBytes = 0L;
-            this.containerNo = 0;
-            this.index = new HashMap<>();
-        }
-    }
-
     // Helper for computing MD5 hash
-    public static String md5(byte[] input) throws NoSuchAlgorithmException {
+    public static String MD5(byte[] input) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
         md.update(input);
         byte[] hashbyte = md.digest();
@@ -90,34 +45,34 @@ public class MyDedup {
         }
     }
 
-    // Compute chunk boundaries using Rabin fingerprinting
-    public static List<Integer> computeBoundaries(byte[] data, int minChunk, int avgChunk, int maxChunk) {
+    // Compute using Rabin fingerprinting
+    public static List<Integer> Anchoring(byte[] data, int minChunk, int avgChunk, int maxChunk) {
         if ((minChunk & (minChunk - 1)) != 0 || (avgChunk & (avgChunk - 1)) != 0 || (maxChunk & (maxChunk - 1)) != 0) {
             throw new IllegalArgumentException("Chunk sizes must be powers of 2");
         }
-        List<Integer> boundaries = new ArrayList<>();
-        boundaries.add(0);
+        List<Integer> anchors = new ArrayList<>();
+        anchors.add(0);
 
         int dm1 = (int) Math.pow(d, minChunk - 1) % avgChunk;
         int prevRfp = 0;
 
         for (int i = 0; i + minChunk <= data.length; i++) {
-            if (i - boundaries.get(boundaries.size() - 1) + 1 >= maxChunk) {
-                boundaries.add(i + 1);
+            if (i - anchors.get(anchors.size() - 1) + 1 >= maxChunk) {
+                anchors.add(i + 1);
                 continue;
             }
-            int rfp = (i == 0 || i == boundaries.get(boundaries.size() - 1))
+            int rfp = (i == 0 || i == anchors.get(anchors.size() - 1))
                     ? computeInitialRfp(data, i, minChunk, avgChunk)
                     : d * (prevRfp - dm1 * data[i - 1]) + data[i + minChunk - 1];
             rfp %= avgChunk;
             prevRfp = rfp;
 
             if ((rfp & (avgChunk - 1)) == 0 && i + minChunk < data.length) {
-                boundaries.add(i + minChunk);
+                anchors.add(i + minChunk);
                 i += minChunk - 1;
             }
         }
-        return boundaries;
+        return anchors;
     }
 
     private static int computeInitialRfp(byte[] data, int start, int chunkSize, int avgChunk) {
@@ -180,7 +135,7 @@ public class MyDedup {
       }
   
       // Perform chunking
-      List<Integer> boundaries = computeBoundaries(fileData, minChunk, avgChunk, maxChunk);
+      List<Integer> anchors = Anchoring(fileData, minChunk, avgChunk, maxChunk);
       ByteArrayOutputStream containerBuffer = new ByteArrayOutputStream();
       int containerBytes = 0;
   
@@ -189,12 +144,12 @@ public class MyDedup {
   
       List<ChunkMetadata> fileChunks = new ArrayList<>();
   
-      for (int i = 0; i < boundaries.size(); i++) {
-          int chunkStart = boundaries.get(i);
-          int chunkEnd = (i == boundaries.size() - 1) ? fileData.length : boundaries.get(i + 1);
+      for (int i = 0; i < anchors.size(); i++) {
+          int chunkStart = anchors.get(i);
+          int chunkEnd = (i == anchors.size() - 1) ? fileData.length : anchors.get(i + 1);
   
           byte[] chunkData = Arrays.copyOfRange(fileData, chunkStart, chunkEnd);
-          String hash = md5(chunkData);
+          String hash = MD5(chunkData);
   
           ChunkMetadata metadata;
           if (index.index.containsKey(hash)) {
@@ -349,5 +304,49 @@ public class MyDedup {
       System.out.println("Total bytes of unique chunks: " + index.uniqueBytes);
       System.out.println("Deduplication ratio: " + String.format("%.2f", (float) index.logicalBytes / index.uniqueBytes));
   }
-  
+
+  // Chunk Metadata Class
+  public static class ChunkMetadata implements Serializable {
+    public String containerId;
+    public int offset;
+    public int chunkSize;
+    public int refCount;
+
+    public ChunkMetadata() {
+        this.containerId = "";
+        this.offset = 0;
+        this.chunkSize = 0;
+        this.refCount = 0;
+    }
+  }
+
+  // File Recipes Class
+  public static class FileRecipes implements Serializable {
+    public HashMap<String, List<ChunkMetadata>> recipe;
+
+    public FileRecipes() {
+        this.recipe = new HashMap<>();
+    }
+  }
+
+  // Fingerprint Indexing Class
+  public static class FingerprintIndexing implements Serializable {
+    public int numOfFiles;
+    public long logicalChunks;
+    public long uniqueChunks;
+    public long logicalBytes;
+    public long uniqueBytes;
+    public int containerNo;
+    public HashMap<String, ChunkMetadata> index;
+
+    public FingerprintIndexing() {
+        this.numOfFiles = 0;
+        this.logicalChunks = 0L;
+        this.uniqueChunks = 0L;
+        this.logicalBytes = 0L;
+        this.uniqueBytes = 0L;
+        this.containerNo = 0;
+        this.index = new HashMap<>();
+    }
+  }
 }
