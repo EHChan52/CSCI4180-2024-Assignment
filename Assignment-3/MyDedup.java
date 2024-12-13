@@ -205,7 +205,7 @@ class MyDedup {
                 ByteArrayOutputStream data = new ByteArrayOutputStream();
 
                 for (Chunk chunk : chunkList) {
-                    FileInputStream finContainer = new FileInputStream("./data/" + chunk.getContainerID());
+                    FileInputStream finContainer = new FileInputStream("data/" + chunk.getContainerID());
                     finContainer.skip(chunk.getOffset());
                     byte[] containerData = new byte[(int) chunk.getSize()];
                     finContainer.read(containerData);
