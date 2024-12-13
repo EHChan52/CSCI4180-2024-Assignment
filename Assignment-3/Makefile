@@ -29,5 +29,11 @@ delete: $(CLASS_FILES)
 clean:
 	rm -f *.class
 
+# Clean all target: remove compiled class files and delete data folder
+clean_all:
+	rm -f *.class
+	rm -rf data
+
 # Phony targets
-.PHONY: all upload download delete clean
+.PHONY: all upload download delete clean clean_all
+

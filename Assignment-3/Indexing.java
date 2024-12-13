@@ -63,44 +63,11 @@ public class Indexing {
     }
 
     public static Container loadContainer(File containerFile) throws IOException {
-        try (DataInputStream dis = new DataInputStream(new FileInputStream(containerFile))) {
-            // Read container metadata
-            int containerID = dis.readInt();
-            long size = dis.readLong();
-            long maxSize = dis.readLong();
-
-            // Create container
-            Container container = new Container(containerID);
-            container.setSize(size);
-
-            // Read chunk data
-            while (dis.available() > 0) {
-                long chunkSize = dis.readLong(); // Read chunk size
-                byte[] chunkData = new byte[(int) chunkSize];
-                dis.readFully(chunkData); // Read raw chunk data
-
-                Chunk chunk = new Chunk();
-                chunk.setData(chunkData);
-                container.getChunkContents().add(chunk);
-            }
-
-            return container;
-        }
+        return null;
     }
 
     public static void saveContainer(File containerFile, Container container) throws IOException {
-        try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(containerFile))) {
-            // Write container metadata
-            dos.writeInt(container.getContainerID());
-            dos.writeLong(container.getSize());
-            dos.writeLong(container.maxSize);
-
-            // Write chunk data
-            for (Chunk chunk : container.getChunkContents()) {
-                dos.writeLong(chunk.getSize()); // Write chunk size
-                dos.write(chunk.getData());     // Write raw chunk data
-            }
-        }
+        
     }
 
     public static FileRecipe loadRecipe(File recipeFile) {
@@ -222,6 +189,22 @@ public class Indexing {
         }
         if (!tempFile.renameTo(indexFile)) {
             System.err.println("Could not rename temporary index file");
+        }
+    }
+
+    public static void updateIndex(ArrayList<Chunk> chunkMetadata, ArrayList<Chunk> newChunks) {
+        for (Chunk newChunk : newChunks) {
+            boolean isUnique = true;
+            for (Chunk existingChunk : chunkMetadata) {
+                if (Arrays.equals(existingChunk.getChecksum(), newChunk.getChecksum())) {
+                    existingChunk.incrementReferenceCount();
+                    isUnique = false;
+                    break;
+                }
+            }
+            if (isUnique) {
+                chunkMetadata.add(newChunk);
+            }
         }
     }
 

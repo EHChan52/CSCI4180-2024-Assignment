@@ -124,22 +124,22 @@ class MyDedup {
                         Anchoring anchoring = new Anchoring();
                         int[] anchors = anchoring.generateAnchors(fingerprints, minChunkSize, avgChunkSize, maxChunkSize);
                         //print out the contents of anchors
-                        /*
+                        
                         for (int anchor : anchors) {
                             System.out.println(anchor);
-                        }*/
+                        }
                         Chunking chunker = new Chunking();
                         ArrayList<Chunk> chunksList = chunker.generateChunks(fileContent, anchors, anchors.length);
-                        /* 
+                        
                         for (Chunk chunk : chunksList) {
                             System.out.println(chunk);
-                        }*/
+                        }
                         WrapToContainer containers = new WrapToContainer();
                         containerList = containers.createContainers(chunksList);
-                        /*
+                        
                         for (Container container : containerList) {
                             System.out.println(container);
-                        }*/
+                        }
 
                         FileRecipe recipe = new FileRecipe(fileToUpload.getName(), chunksList);
 
@@ -169,12 +169,13 @@ class MyDedup {
                         }
 
                         Indexing.saveIndex(indexFile, chunkMetadata);
+                        
                         for (Container container : containerList) {
-                            File containerFile = new File("data/container-" + container.getContainerID() + ".bin");
+                            File containerFile = new File("./data/container-" + container.getContainerID() + ".bin");
                             Indexing.saveContainer(containerFile, container);
                         }
 
-                        File recipeFile = new File("data/recipe-" + fileToUpload.getName() + ".txt");
+                        File recipeFile = new File("./data/recipe-" + fileToUpload.getName());
                         Indexing.saveRecipe(recipeFile, recipe);
 
                     }
@@ -204,7 +205,7 @@ class MyDedup {
                 ByteArrayOutputStream data = new ByteArrayOutputStream();
 
                 for (Chunk chunk : chunkList) {
-                    FileInputStream finContainer = new FileInputStream("data/" + chunk.getContainerID(););
+                    FileInputStream finContainer = new FileInputStream("./data/" + chunk.getContainerID());
                     finContainer.skip(chunk.getOffset());
                     byte[] containerData = new byte[(int) chunk.getSize()];
                     finContainer.read(containerData);
