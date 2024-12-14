@@ -60,32 +60,38 @@ public class MyDedup {
     }
 
     // Compute using Rabin fingerprinting
-    public static List<Integer> Anchoring(byte[] data, int minChunk, int avgChunk, int maxChunk) {
+    public static List<Integer> Anchoring(byte[] input, int minChunk, int avgChunk, int maxChunk) {
+        // Ensure chunk sizes are powers of 2
         if ((minChunk & (minChunk - 1)) != 0 || (avgChunk & (avgChunk - 1)) != 0 || (maxChunk & (maxChunk - 1)) != 0) {
             throw new IllegalArgumentException("Chunk sizes must be powers of 2");
         }
+    
         List<Integer> anchors = new ArrayList<>();
-        anchors.add(0);
-
-        int dm1 = (int) Math.pow(d, minChunk - 1) % avgChunk;
-        int prevRfp = 0;
-
-        for (int i = 0; i + minChunk <= data.length; i++) {
-            if (i - anchors.get(anchors.size() - 1) + 1 >= maxChunk) {
-                anchors.add(i + 1);
-                continue;
+        anchors.add(0); // Start with the first anchor at position 0
+    
+        int windowSize = minChunk; // Fixed-size sliding window
+        int rollingHash = 0;
+        int dm1 = 1; // Precompute d^(windowSize - 1) % avgChunk
+        for (int i = 0; i < windowSize - 1; i++) {
+            dm1 = (dm1 * d) % avgChunk;
+        }
+    
+        for (int i = 0; i < input.length; i++) {
+            if (i >= windowSize) {
+                // Remove the oldest byte and add the new byte to the rolling hash
+                rollingHash = (rollingHash - (dm1 * input[i - windowSize]) % avgChunk + avgChunk) % avgChunk;
             }
-            int rfp = (i == 0 || i == anchors.get(anchors.size() - 1))
-                    ? computeInitialRfp(data, i, minChunk, avgChunk)
-                    : d * (prevRfp - dm1 * data[i - 1]) + data[i + minChunk - 1];
-            rfp %= avgChunk;
-            prevRfp = rfp;
-
-            if ((rfp & (avgChunk - 1)) == 0 && i + minChunk < data.length) {
-                anchors.add(i + minChunk);
-                i += minChunk - 1;
+            rollingHash = (rollingHash * d + input[i]) % avgChunk;
+    
+            // Create an anchor if rollingHash matches the anchor mask
+            boolean isAnchor = (rollingHash & (avgChunk - 1)) == 0;
+            boolean exceedsMaxChunk = (i - anchors.get(anchors.size() - 1) + 1) >= maxChunk;
+    
+            if (isAnchor || exceedsMaxChunk) {
+                anchors.add(i + 1); // Add the new anchor point
             }
         }
+    
         return anchors;
     }
 
@@ -126,87 +132,87 @@ public class MyDedup {
     }
 
     private static void handleUpload(String[] args) throws IOException, ClassNotFoundException, NoSuchAlgorithmException {
-      int minChunk = Integer.parseInt(args[1]);
-      int avgChunk = Integer.parseInt(args[2]);
-      int maxChunk = Integer.parseInt(args[3]);
-      String filePath = args[4];
-  
-      File inputFile = new File(filePath);
-      if (!inputFile.exists() || !inputFile.isFile()) {
-          throw new FileNotFoundException("File not found: " + filePath);
-      }
-  
-      byte[] fileData = Files.readAllBytes(inputFile.toPath());
-  
-      // Load metadata
-      FingerprintIndexing index = loadMetadata(INDEX_FILE, FingerprintIndexing.class);
-      FileRecipes recipes = loadMetadata(RECIPE_FILE, FileRecipes.class);
-  
-      // Check if the file is already uploaded
-      if (recipes.recipe.containsKey(filePath)) {
-          System.out.println("File is already uploaded.");
-          return;
-      }
-  
-      // Perform chunking
-      List<Integer> anchors = Anchoring(fileData, minChunk, avgChunk, maxChunk);
-      ByteArrayOutputStream containerBuffer = new ByteArrayOutputStream();
-      int containerBytes = 0;
-  
-      File containerDir = new File(DATA_DIR);
-      if (!containerDir.exists()) containerDir.mkdirs();
-  
-      List<ChunkMetadata> fileChunks = new ArrayList<>();
-  
-      for (int i = 0; i < anchors.size(); i++) {
-          int chunkStart = anchors.get(i);
-          int chunkEnd = (i == anchors.size() - 1) ? fileData.length : anchors.get(i + 1);
-  
-          byte[] chunkData = Arrays.copyOfRange(fileData, chunkStart, chunkEnd);
-          String hash = MD5(chunkData);
-  
-          ChunkMetadata metadata;
-          if (index.index.containsKey(hash)) {
-              metadata = index.index.get(hash);
-              metadata.refCount++;
-          } else {
-              if (containerBytes + chunkData.length > 1048576) {
-                  flushContainer(containerBuffer, index, containerBytes);
-                  containerBuffer.reset();
-                  containerBytes = 0;
-              }
-  
-              metadata = new ChunkMetadata();
-              metadata.containerId = "container-" + index.containerNo;
-              metadata.offset = containerBytes;
-              metadata.chunkSize = chunkData.length;
-              metadata.refCount = 1;
-  
-              containerBuffer.write(chunkData);
-              containerBytes += chunkData.length;
-  
-              index.index.put(hash, metadata);
-              index.uniqueChunks++;
-              index.uniqueBytes += chunkData.length;
-          }
-  
-          fileChunks.add(metadata);
-          index.logicalChunks++;
-          index.logicalBytes += chunkData.length;
-      }
-  
-      if (containerBytes > 0) {
-          flushContainer(containerBuffer, index, containerBytes);
-      }
-  
-      recipes.recipe.put(filePath, fileChunks);
-      index.numOfFiles++;
-  
-      saveMetadata(INDEX_FILE, index);
-      saveMetadata(RECIPE_FILE, recipes);
-  
-      printStatistics(index);
-  }
+        int minChunk = Integer.parseInt(args[1]);
+        int avgChunk = Integer.parseInt(args[2]);
+        int maxChunk = Integer.parseInt(args[3]);
+        String filePath = args[4];
+    
+        File inputFile = new File(filePath);
+        if (!inputFile.exists() || !inputFile.isFile()) {
+            throw new FileNotFoundException("File not found: " + filePath);
+        }
+    
+        byte[] fileData = Files.readAllBytes(inputFile.toPath());
+    
+        // Load metadata
+        FingerprintIndexing index = loadMetadata(INDEX_FILE, FingerprintIndexing.class);
+        FileRecipes recipes = loadMetadata(RECIPE_FILE, FileRecipes.class);
+    
+        // Check if the file is already uploaded
+        if (recipes.recipe.containsKey(filePath)) {
+            System.out.println("File is already uploaded.");
+            return;
+        }
+    
+        // Perform chunking using optimized computeAnchors method
+        List<Integer> anchors = Anchoring(fileData, minChunk, avgChunk, maxChunk);
+        ByteArrayOutputStream containerBuffer = new ByteArrayOutputStream();
+        int containerBytes = 0;
+    
+        File containerDir = new File(DATA_DIR);
+        if (!containerDir.exists()) containerDir.mkdirs();
+    
+        List<ChunkMetadata> fileChunks = new ArrayList<>();
+    
+        for (int i = 0; i < anchors.size(); i++) {
+            int chunkStart = anchors.get(i);
+            int chunkEnd = (i == anchors.size() - 1) ? fileData.length : anchors.get(i + 1);
+    
+            byte[] chunkData = Arrays.copyOfRange(fileData, chunkStart, chunkEnd);
+            String hash = MD5(chunkData);
+    
+            ChunkMetadata metadata;
+            if (index.index.containsKey(hash)) {
+                metadata = index.index.get(hash);
+                metadata.refCount++;
+            } else {
+                if (containerBytes + chunkData.length > 1048576) {
+                    flushContainer(containerBuffer, index, containerBytes);
+                    containerBuffer.reset();
+                    containerBytes = 0;
+                }
+    
+                metadata = new ChunkMetadata();
+                metadata.containerId = "container-" + index.containerNo;
+                metadata.offset = containerBytes;
+                metadata.chunkSize = chunkData.length;
+                metadata.refCount = 1;
+    
+                containerBuffer.write(chunkData);
+                containerBytes += chunkData.length;
+    
+                index.index.put(hash, metadata);
+                index.uniqueChunks++;
+                index.uniqueBytes += chunkData.length;
+            }
+    
+            fileChunks.add(metadata);
+            index.logicalChunks++;
+            index.logicalBytes += chunkData.length;
+        }
+    
+        if (containerBytes > 0) {
+            flushContainer(containerBuffer, index, containerBytes);
+        }
+    
+        recipes.recipe.put(filePath, fileChunks);
+        index.numOfFiles++;
+    
+        saveMetadata(INDEX_FILE, index);
+        saveMetadata(RECIPE_FILE, recipes);
+    
+        printStatistics(index);
+    }
   
   private static void flushContainer(ByteArrayOutputStream containerBuffer, FingerprintIndexing index, int containerBytes) throws IOException {
       File containerFile = new File(DATA_DIR + "container-" + index.containerNo);
@@ -295,6 +301,10 @@ public class MyDedup {
                 index.uniqueBytes -= metadata.chunkSize;
             }
 
+            // Update logicalBytes and logicalChunks
+            index.logicalBytes -= metadata.chunkSize;
+            index.logicalChunks--;
+
             // Add the container to the list of affected containers
             affectedContainers.add(chunk.containerId);
         }
@@ -328,14 +338,31 @@ public class MyDedup {
     printStatistics(index);
 }
   
-  private static void printStatistics(FingerprintIndexing index) {
-      System.out.println("Total number of files stored: " + index.numOfFiles);
-      System.out.println("Total number of pre-deduplicated chunks: " + index.logicalChunks);
-      System.out.println("Total number of unique chunks: " + index.uniqueChunks);
-      System.out.println("Total bytes of pre-deduplicated chunks: " + index.logicalBytes);
-      System.out.println("Total bytes of unique chunks: " + index.uniqueBytes);
-      System.out.println("Deduplication ratio: " + String.format("%.2f", (float) index.logicalBytes / index.uniqueBytes));
-  }
+private static void printStatistics(FingerprintIndexing index) {
+    // Calculate the total number of containers
+    File containerDir = new File(DATA_DIR);
+    int totalContainers = 0;
+
+    if (containerDir.exists() && containerDir.isDirectory()) {
+        // Count files that start with "container_"
+        totalContainers = (int) Arrays.stream(containerDir.list())
+                                      .filter(fileName -> fileName.startsWith("container-"))
+                                      .count();
+    }
+
+    System.out.println("Total number of files that have been stored: " + index.numOfFiles);
+    System.out.println("Total number of pre-deduplicated chunks in storage: " + index.logicalChunks);
+    System.out.println("Total number of unique chunks in storage: " + index.uniqueChunks);
+    System.out.println("Total number of bytes of pre-deduplicated chunks in storage: " + index.logicalBytes);
+    System.out.println("Total number of bytes of unique chunks in storage: " + index.uniqueBytes);
+    System.out.println("Total number of containers in storage: " + totalContainers);
+
+    if (index.uniqueBytes > 0) {
+        System.out.println("Deduplication ratio: " + String.format("%.2f", (float) index.logicalBytes / index.uniqueBytes));
+    } else {
+        System.out.println("Deduplication ratio: N/A (No unique bytes stored)");
+    }
+}
 
   // Chunk Metadata Class
   public static class ChunkMetadata implements Serializable {
