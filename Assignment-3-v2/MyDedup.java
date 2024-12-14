@@ -1,10 +1,24 @@
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.RandomAccessFile;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class MyDedup {
 
@@ -238,63 +252,81 @@ public class MyDedup {
   }
   
   private static void handleDelete(String filePath) throws IOException, ClassNotFoundException {
-      FileRecipes recipes = loadMetadata(RECIPE_FILE, FileRecipes.class);
-      FingerprintIndexing index = loadMetadata(INDEX_FILE, FingerprintIndexing.class);
-  
-      if (!recipes.recipe.containsKey(filePath)) {
-          System.out.println("File not found in storage.");
-          return;
-      }
-  
-      List<ChunkMetadata> fileChunks = recipes.recipe.get(filePath);
-      Map<String, Boolean> containerUsed = new HashMap<>();
-  
-      for (ChunkMetadata chunk : fileChunks) {
-          String chunkHash = null;
-  
-          for (Map.Entry<String, ChunkMetadata> entry : index.index.entrySet()) {
-              if (entry.getValue().containerId.equals(chunk.containerId)
-                      && entry.getValue().offset == chunk.offset
-                      && entry.getValue().chunkSize == chunk.chunkSize) {
-                  chunkHash = entry.getKey();
-                  break;
-              }
-          }
-  
-          if (chunkHash != null) {
-              ChunkMetadata metadata = index.index.get(chunkHash);
-              metadata.refCount--;
-  
-              if (metadata.refCount <= 0) {
-                  index.index.remove(chunkHash);
-                  index.uniqueChunks--;
-                  index.uniqueBytes -= metadata.chunkSize;
-              }
-          }
-  
-          containerUsed.put(chunk.containerId, true);
-      }
-  
-      recipes.recipe.remove(filePath);
-      index.numOfFiles--;
-  
-      for (String containerId : containerUsed.keySet()) {
-          boolean containerStillInUse = index.index.values().stream()
-                  .anyMatch(chunk -> chunk.containerId.equals(containerId));
-  
-          if (!containerStillInUse) {
-              File containerFile = new File(DATA_DIR + containerId);
-              if (containerFile.exists()) {
-                  containerFile.delete();
-              }
-          }
-      }
-  
-      saveMetadata(INDEX_FILE, index);
-      saveMetadata(RECIPE_FILE, recipes);
-  
-      printStatistics(index);
-  }
+    // Load metadata
+    FileRecipes recipes = loadMetadata(RECIPE_FILE, FileRecipes.class);
+    FingerprintIndexing index = loadMetadata(INDEX_FILE, FingerprintIndexing.class);
+
+    // Check if the file exists in the metadata
+    if (!recipes.recipe.containsKey(filePath)) {
+        System.out.println("File not found in storage.");
+        return;
+    }
+
+    // Get the list of chunks associated with the file
+    List<ChunkMetadata> fileChunks = recipes.recipe.get(filePath);
+
+    // Track containers that need to be checked for emptiness
+    Set<String> affectedContainers = new HashSet<>();
+
+    // Step 1: Update reference counts and identify invalid chunks
+    for (ChunkMetadata chunk : fileChunks) {
+        String chunkHash = null;
+
+        // Find the chunk in the index by matching metadata
+        for (Map.Entry<String, ChunkMetadata> entry : index.index.entrySet()) {
+            ChunkMetadata metadata = entry.getValue();
+            if (metadata.containerId.equals(chunk.containerId) &&
+                metadata.offset == chunk.offset &&
+                metadata.chunkSize == chunk.chunkSize) {
+                chunkHash = entry.getKey();
+                break;
+            }
+        }
+
+        // Decrement reference count and handle invalid chunks
+        if (chunkHash != null) {
+            ChunkMetadata metadata = index.index.get(chunkHash);
+            metadata.refCount--;
+
+            // If the chunk is no longer referenced, mark it as invalid
+            if (metadata.refCount <= 0) {
+                index.index.remove(chunkHash);
+                index.uniqueChunks--;
+                index.uniqueBytes -= metadata.chunkSize;
+            }
+
+            // Add the container to the list of affected containers
+            affectedContainers.add(chunk.containerId);
+        }
+    }
+
+    // Step 2: Remove file metadata from recipes
+    recipes.recipe.remove(filePath);
+    index.numOfFiles--;
+
+    // Step 3: Identify and delete empty containers
+    for (String containerId : affectedContainers) {
+        File containerFile = new File(DATA_DIR + containerId);
+
+        // Check if all chunks in the container are invalid
+        boolean isContainerEmpty = index.index.values().stream()
+            .noneMatch(chunk -> chunk.containerId.equals(containerId));
+
+        // If the container is empty, delete it
+        if (isContainerEmpty) {
+            if (containerFile.exists()) {
+                containerFile.delete();
+            }
+        }
+    }
+
+    // Step 4: Save updated metadata
+    saveMetadata(RECIPE_FILE, recipes);
+    saveMetadata(INDEX_FILE, index);
+
+    // Report updated statistics
+    printStatistics(index);
+}
   
   private static void printStatistics(FingerprintIndexing index) {
       System.out.println("Total number of files stored: " + index.numOfFiles);
