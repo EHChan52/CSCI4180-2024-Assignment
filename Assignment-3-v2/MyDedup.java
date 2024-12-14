@@ -61,7 +61,6 @@ public class MyDedup {
 
     // Compute using Rabin fingerprinting
     public static List<Integer> Anchoring(byte[] input, int minChunk, int avgChunk, int maxChunk) {
-        // Ensure chunk sizes are powers of 2
         if ((minChunk & (minChunk - 1)) != 0 || (avgChunk & (avgChunk - 1)) != 0 || (maxChunk & (maxChunk - 1)) != 0) {
             throw new IllegalArgumentException("Chunk sizes must be powers of 2");
         }
@@ -69,39 +68,55 @@ public class MyDedup {
         List<Integer> anchors = new ArrayList<>();
         anchors.add(0); // Start with the first anchor at position 0
     
-        int windowSize = minChunk; // Fixed-size sliding window
+        int dm1 = ModPower(d, minChunk - 1, avgChunk); // Precompute d^(m-1) % q
         int rollingHash = 0;
-        int dm1 = 1; // Precompute d^(windowSize - 1) % avgChunk
-        for (int i = 0; i < windowSize - 1; i++) {
-            dm1 = (dm1 * d) % avgChunk;
-        }
     
-        for (int i = 0; i < input.length; i++) {
-            if (i >= windowSize) {
-                // Remove the oldest byte and add the new byte to the rolling hash
-                rollingHash = (rollingHash - (dm1 * input[i - windowSize]) % avgChunk + avgChunk) % avgChunk;
+        for (int s = 0; s + minChunk <= input.length; s++) {
+            // Create a boundary if max_chunk is exceeded
+            if ((s - anchors.get(anchors.size() - 1) + 1) >= maxChunk) {
+                anchors.add(s + 1);
+                continue;
             }
-            rollingHash = (rollingHash * d + input[i]) % avgChunk;
     
-            // Create an anchor if rollingHash matches the anchor mask
-            boolean isAnchor = (rollingHash & (avgChunk - 1)) == 0;
-            boolean exceedsMaxChunk = (i - anchors.get(anchors.size() - 1) + 1) >= maxChunk;
+            // Calculate the Rabin fingerprint (rfp)
+            if (s == 0 || s == anchors.get(anchors.size() - 1)) {
+                // Start of a file or chunk: Compute the initial fingerprint
+                rollingHash = 0;
+                for (int i = 0; i < minChunk; i++) {
+                    rollingHash += (input[s + i] * ModPower(d, minChunk - i, avgChunk)) % avgChunk;
+                }
+            } else {
+                // Rolling hash: Update based on the previous fingerprint
+                rollingHash = d * (rollingHash - dm1 * input[s - 1]) + input[s + minChunk - 1];
+            }
+            rollingHash = rollingHash % avgChunk;
     
-            if (isAnchor || exceedsMaxChunk) {
-                anchors.add(i + 1); // Add the new anchor point
+            // Create a boundary if the anchor condition is met
+            if ((rollingHash & (avgChunk - 1)) == 0 && s + minChunk < input.length) {
+                anchors.add(s + minChunk);
+                s = s + minChunk - 1;
             }
         }
     
         return anchors;
     }
 
-    private static int computeInitialRfp(byte[] data, int start, int chunkSize, int avgChunk) {
-        int rfp = 0;
-        for (int i = 0; i < chunkSize; i++) {
-            rfp += data[start + i] * Math.pow(d, chunkSize - i) % avgChunk;
+    public static int ModPower(int base, int exp, int q) {
+        int result = base % q; // Start with base mod q
+        while (exp - 1 > 0) {  // Iterate until exp reduces to 1
+            result = (result * (base % q)) % q; // Multiply and reduce mod q
+            exp--;
         }
-        return rfp % avgChunk;
+        return result % q; // Final reduction mod q
     }
+
+    // private static int computeInitialRfp(byte[] data, int start, int chunkSize, int avgChunk) {
+    //     int rfp = 0;
+    //     for (int i = 0; i < chunkSize; i++) {
+    //         rfp += data[start + i] * Math.pow(d, chunkSize - i) % avgChunk;
+    //     }
+    //     return rfp % avgChunk;
+    // }
 
     public static void main(String[] args) {
         try {
